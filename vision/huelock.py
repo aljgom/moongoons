@@ -19,61 +19,53 @@ import sys
 
 class Huelock():
 
-    def __init__(self, color_min=[130, 220, 95], color_max=[180, 255, 255]):
+    def __init__(self, color_min=(130, 220, 95), color_max=(180, 255, 255)):
         # Default colors work to detect red-cup red!
         self.color_min = cv.Scalar(color_min[0], color_min[1], color_min[2])
         self.color_max = cv.Scalar(color_max[0], color_max[1], color_max[2])
 
-    # Returns x, y of object
-    def detect_hue(self, image_filename):
-        # Get the image from disk (TODO: get a stream instead)
-        frame = cv.LoadImage(image_filename)
-        frameHSV = cv.CreateImage(cv.GetSize(frame), 8, 3)
-        cv.CvtColor(frame, frameHSV, cv.CV_RGB2HSV)
+        self.posX = 0
+        self.posY = 0
+
+    # Returns x, y of object or None if the threshold was not met
+    def detect_hue(self, image_filename=None, image_data=None, threshold=0):
+        if image_filename:
+            # Get the image from disk
+            frame = cv.LoadImage(image_filename)
+            frameHSV = cv.CreateImage(cv.GetSize(frame), 8, 3)
+            cv.CvtColor(frame, frameHSV, cv.CV_RGB2HSV)
+
+        elif image_data:
+            # Raw image from feed
+            cv.Smooth(image_data, image_data, cv.CV_BLUR, 3)
+            hsv = cv.CreateImage(cv.GetSize(image_data), 8, 3)
+            cv.CvtColor(image_data, hsv, cv.CV_BGR2HSV)
+            frameHSV = hsv
+
+        else:
+            print "ERROR: No image file or data specified!"
+            sys.exit()
 
         # Generate new image object with only the detected color in white
-        frame_threshed = cv.CreateImage(cv.GetSize(frameHSV), 8, 1)
+        frame_threshed = cv.CreateImage(cv.GetSize(image_data), 8, 1)
         cv.InRangeS(frameHSV, self.color_min, self.color_max, frame_threshed)
 
-        # Get and return coordinates of the center of the color mass
-        center = self.find_center(frame_threshed, 0, 0, frame_threshed.width, frame_threshed.height)
+        mat = cv.GetMat(frame_threshed)
 
-        return center
+        #Calculating the moments
+        moments = cv.Moments(mat, 0)
+        area = cv.GetCentralMoment(moments, 0, 0)
+        moment10 = cv.GetSpatialMoment(moments, 1, 0)
+        moment01 = cv.GetSpatialMoment(moments, 0,1)
 
-    # Finds center of mass having defined color recursively
-    def find_center(self, matrix, left, top, right, bot):
-        # Separate thresholded matrix into four quadrants and find the darkest
-        mid_x, mid_y = (int((left + right) / 2), int((top + bot) / 2))
-
-        # Base case
-        if (right - left < 3) or (bot - top < 3):
-            return (mid_x, mid_y)
-
-        # Otherwise, initialize scores and recursively score quadrants
-        quadrant_scores = [0, 0, 0, 0]
-
-        for x in xrange(left, right):
-            for y in xrange(top, bot):
-                if matrix[y, x] > 0:  # yeah I know, right? Y, X. WTF
-                    quadrant_scores[self.quadrant(x, y, mid_x, mid_y)] += 1
-
-        # Functional magic to tally up scores to find the best next quad
-        winning_quad = max(enumerate(quadrant_scores), key=lambda kvp: kvp[1])[0]
-
-        # Calculate bounds of next region to search
-        new_left = left if winning_quad in [0, 2] else mid_x
-        new_right = mid_x if winning_quad in [0, 2] else right
-        new_top = top if winning_quad in [0, 1] else mid_y
-        new_bot = mid_y if winning_quad in [0, 1] else bot
-
-        return self.find_center(matrix, new_left, new_top, new_right, new_bot)
-
-    def quadrant(self, x, y, mid_x, mid_y):
-        #Utility function to find quadrants in a x by y rectangle
-        # Quadrants are as follows:
-        # Quad0 Quad1
-        # Quad2 Quad3
-        return 2 * (y > mid_y) + 1 * (x > mid_x)
+        if (int(area) > int(threshold)):
+            #Calculating the coordinate postition of the centroid
+            self.posX = int(moment10 / area)
+            self.posY = int(moment01 / area)
+            print 'x: ' + str(self.posX) + ' y: ' + str(self.posY) + ' area: ' + str(area)
+            return (self.posX, self.posY)
+        else:
+            return None
 
 
 def cli():
@@ -84,21 +76,47 @@ def cli():
         print "Usage: ./" + str(sys.argv[0]) + " [filename]"
 
     else:
+        # Live camera display
         if sys.argv[1]=="test":
-            # For testing (HACK) -- uses OSX's builtin imagesnap util
+
+            if len(sys.argv) > 2:
+                threshold = sys.argv[2]
+            else:
+                threshold = 0
+
+            # Create a new window and get the camera data
+            cv.NamedWindow("Camera", 1)
+            stream = cv.CaptureFromCAM(0)
+            font = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 0.5, 1, 0, 2, 8)
+
+            frame = cv.QueryFrame(stream)
+            width = cv.GetSize(frame)[0]
+            height = cv.GetSize(frame)[1]
+
+            # For each frame,
             while True:
-                image_filename = 'temp.png'
-                os.system("imagesnap %s " % image_filename)
+                frame = cv.QueryFrame(stream)
 
-                # Detect center
-                center = detector.detect_hue(image_filename)
-                frame = cv.LoadImage(image_filename)
+                # Detect the color center
+                center = detector.detect_hue(image_data=frame, threshold=threshold)
 
-                # Draw a circle to indicate where the center was found
-                cv.Circle(frame, center, 10, cv.Scalar(0, 255, 255))
-                cv.NamedWindow('a_window', cv.CV_WINDOW_AUTOSIZE)
-                cv.ShowImage('a_window', frame)
-                cv.WaitKey(400)
+                if center:
+                    quadrocopter_value = center[0] / float(width)
+                    quadrocopter_value = quadrocopter_value * 100 - 50
+
+                    # If a center was found, print it and show a circle
+                    cv.PutText(frame, str(center[0])+","+str(center[1]), (30,30), font, (55,25,255))
+                    cv.PutText(frame,"Value is " + str(quadrocopter_value), (30,90), font, (55,25,255))
+                    cv.Circle(frame, center, 10, cv.Scalar(0, 255, 255))
+                else:
+                    # Otherwise, indicate that the threshold wasn't met
+                    cv.PutText(frame,"Not enough red detected...", (30,30), font, (55,25,255))
+
+                cv.ShowImage('Camera', frame)
+
+                # Escape kills the program
+                if cv.WaitKey(10) == 27:
+                    break
         else:
           # Detect object, print result
           print detector.detect_hue(str(sys.argv[1]))
