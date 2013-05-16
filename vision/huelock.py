@@ -1,9 +1,7 @@
 # @name               huelock.py
-# @desc               Finds the center of colored masses (default
-#                     calibrated to red) and returns it
-# @initial_authors    Alexey Komissarouk <alexey86@gmail.com>
+# @desc               Detect a color moment in an image.
 # @contributors       Sam Liu <sam@ambushnetworks.com>
-# @copyright          MIT License / WTFPL License
+# @copyright          All rights reserved
 
 # Notes
 # -----
