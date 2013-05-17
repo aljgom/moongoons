@@ -103,6 +103,7 @@ int main()
         x+=dx;
         y+=dy;
         printf("diff between img %5d and %5d -> dx=%2d dy=%2d x=%4d y=%4d\n",img_old->seq,img_new->seq,dx,dy,x,y);
+        // Swap images so we have the previous image and the current new image
         if(dx!=0 || dy!=0) {
             img_struct* tmp = img_new;
             img_new = img_old;
@@ -114,8 +115,8 @@ int main()
         // program might freeze!! OR we need to use TCP.
         // ???? HOW TO DO THIS?
         // TODO: EXPERIMENT WITH JUST SENDING A PARAGRAPH OF TEXT OR SOMETHING
-        // Another todo: WHAT FORMAT IS THIS PICTURE?!
-        // WE CAN FIGURE THAT OUT LATER THOUGH.
+
+        // Image is a YUV420 imagestring...maybe we should check the length of it via strlen?
 
 
 
