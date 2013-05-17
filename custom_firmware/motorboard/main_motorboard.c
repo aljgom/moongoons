@@ -60,7 +60,11 @@ int main()
 
     // Initialize getting a picture
     vid_struct vid;
-    vid.device = (char*)"/dev/video1";
+
+    // Video0 is front camera, video1 is bottom camera
+    vid.device = (char*)"/dev/video0";
+
+    // Other params for video
     vid.w=176;
     vid.h=144;
     vid.n_buffers = 4;
