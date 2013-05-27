@@ -86,7 +86,7 @@ void *video_thread_main(void* data)
 		if(vid->trigger) {
 			vid->img->timestamp = util_timestamp();
 			vid->img->seq = vid->seq;
-			memcpy(vid->img->buf, vid->buffers[buf.index].buf, vid->w*vid->h);
+			memcpy(vid->img->buf, vid->buffers[buf.index].buf, (vid->w*vid->h)*3/2);
 			vid->trigger=0;
 		}
 	
@@ -115,7 +115,7 @@ int video_Init(vid_struct *vid)
 		return -1;    
     }
 
-    //printf("2 driver = %s, card = %s, version = %d, capabilities = 0x%x\n", cap.driver, cap.card, cap.version, cap.capabilities);
+    printf("2 driver = %s, card = %s, version = %d, capabilities = 0x%x\n", cap.driver, cap.card, cap.version, cap.capabilities);
 
     CLEAR(fmt);
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -167,8 +167,15 @@ int video_Init(vid_struct *vid)
 			printf ("mmap() failed.\n");
 			return -1;
 		}
+	
+		FILE * file_fd;
+		file_fd = fopen("image.yuv", "wb");
+		fwrite(vid->buffers[3].buf,(vid->w*vid->h)*3/2,1,file_fd);
+		fclose(file_fd);
+	
 	}
-
+	
+	
 	for (i = 0; i < vid->n_buffers; ++i) {
 		struct v4l2_buffer buf;
 
@@ -207,12 +214,14 @@ void video_Close(vid_struct *vid)
     close(vid->fd);
 }
 
+
+//Creates blank image
 img_struct *video_CreateImage(vid_struct *vid)
 {
 	img_struct* img = (img_struct*)malloc(sizeof(img_struct));
 	img->w=vid->w;
 	img->h=vid->h;
-	img->buf = (unsigned char*)malloc(vid->h*vid->w);
+	img->buf = (unsigned char*)malloc((vid->h*vid->w)*3/2); //make room for Cr and Cb values
 	return img;
 }
 
@@ -225,3 +234,4 @@ void video_GrabImage(vid_struct *vid, img_struct *img) {
 	while(vid->trigger) pthread_yield();
 	pthread_mutex_unlock(&video_grab_mutex);
 }
+

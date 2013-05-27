@@ -27,7 +27,7 @@
 #include <ctype.h>    /* For tolower() function */
 #include <math.h>
 
-// For...?
+// For definitions
 #include "../util/type.h"
 #include "../util/util.h"
 
@@ -43,6 +43,14 @@
 
 // For video stuff
 #include "../video/video.h"
+
+//used to exit and print error message
+void error(const char *msg)
+{
+    perror(msg);
+    exit(0);
+}
+
 
 int main()
 {
@@ -65,71 +73,125 @@ int main()
     vid.device = (char*)"/dev/video0";
 
     // Other params for video
-    vid.w=176;
-    vid.h=144;
+    vid.w=640;
+    vid.h=480;
     vid.n_buffers = 4;
+    
+    // Initialize video thread for streaming
     video_Init(&vid);
 
-    // Keep a copy of the old image for efficiency reasons
-    img_struct* img_old = video_CreateImage(&vid);
-    img_struct* img_new = video_CreateImage(&vid);
+    // Create blank image
+    img_struct * img_new = video_CreateImage(&vid);
 
-    // To keep track of changes in the video feed
-    int dx,dy;
-    int x=0,y=0;
+    /*
+    INITIALIZE TCP CONNECTION
+    Note: AR.Drone is server and listens for connection opening
+    IP:192.168.1.1 Port: 7777
+    */
+    
+    // Socket file descriptor, new socket file descriptor, port number
+    int sockfd, newsockfd, portno;
+    socklen_t clilen;
 
-    // Load the old image
-    video_GrabImage(&vid, img_old);
+    // Declare additional variables
+    struct sockaddr_in serv_addr, cli_addr;
+    int n;
 
-    // Blocking wait for a udp packet on port 7777
-    udp_struct udpCmd;
-    udpServer_Init(&udpCmd, 7777, 1);
-    char buf[1024];
-    printf("Waiting for UDP wakeup on port 7777\n");
+    // Open tcp socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        error("ERROR opening socket");
+    }
 
-    // TODO: EXPLAIN WHAT THIS DOES
-    int bufcnt = udpServer_Receive(&udpCmd, buf, 1024);
-    if (bufcnt <= 0) return 1;
-    buf[bufcnt] = 0;
-    printf("UDP wakeup received from %s\n",inet_ntoa(udpCmd.si_other.sin_addr));
+    //zero-initialize serv_addr
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+
+    //set port number
+    portno = 7777;
+
+    //set parameters for serv_addr
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
+
+    //bind socket
+    if (bind(sockfd, (struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+        error("ERROR on binding");
+    }
+
+    //listen for client to open connection
+    listen(sockfd,5);
+    clilen = sizeof(cli_addr);
+
+    //open new socket
+    newsockfd = accept(sockfd,(struct sockaddr *) &cli_addr,&clilen);
+    if (newsockfd < 0) {
+        error("ERROR on accept");
+    }
 
     //Main loop
     while(1) {
-        // 1. Get picture into buffer
+        // Get picture into image buffer from video thread
         video_GrabImage(&vid, img_new);
+	unsigned char * image = img_new->buf;
 
-        // 2. Update the image variables
-        video_blocksum(img_old, img_new, &dx, &dy);
-        x+=dx;
-        y+=dy;
-        printf("diff between img %5d and %5d -> dx=%2d dy=%2d x=%4d y=%4d\n",img_old->seq,img_new->seq,dx,dy,x,y);
-        // Swap images so we have the previous image and the current new image
-        if(dx!=0 || dy!=0) {
-            img_struct* tmp = img_new;
-            img_new = img_old;
-            img_old = tmp;
+	// Loop to send entire buffer to server
+        char buffer[19];
+        unsigned char packet[9216];
+        int m;
+        for (m=0;m<50;m++) {
+            // Load packet buffer to send to server
+            int p = 0;
+            while (p<9216) {
+                packet[p] = image[m*9216+p];
+                p++;
+            }
+
+   	    // Send packet to client
+            n = write(newsockfd,packet,9216);//strlen(packet)
+            if (n < 0) {
+                error("ERROR writing to socket");
+            }
+
+	    // Make sure all 9216 bytes have been sent
+            // If not, resend rest of bytes
+            int sum = n;
+            while (sum < 9216) {
+                n = write(newsockfd,packet+sum,9216-sum);
+                if (n < 0) {
+                    error("ERROR reading from socket");
+                }
+                sum += n;
+	    }
+	}
+
+	/* 
+	GET ANGLE DISPLACEMENT FROM IMAGE PROCESSING CLIENT
+	*/
+	
+	// Read message from client
+        bzero(buffer,19);
+        n = read(newsockfd,buffer,19);
+        if (n < 0) {
+            error("ERROR reading from socket");
         }
 
-        // 3. Send picture via udp with timeout TO sam's python server
-        // A timeout is needed as we need to use ping/ack. Otherwise, our
-        // program might freeze!! OR we need to use TCP.
-        // ???? HOW TO DO THIS?
-        // TODO: EXPERIMENT WITH JUST SENDING A PARAGRAPH OF TEXT OR SOMETHING
+	//Make sure all 19 bytes have been read
+        // If not, reread rest of bytes
+        int sum = n;
+        while (sum < 19) {
+            n = read(newsockfd,buffer+sum,19-sum);
+            if (n < 0) {
+                error("ERROR reading from socket");
+            }
+            sum += n;
+        }
 
-        // Image is a YUV420 imagestring...maybe we should check the length of it via strlen?
-
-
-
-
-        // 4. Wait for a response.
-        // Use client side input instead
-        // Wait for next packet on cmd port
-        bufcnt = udpServer_Receive(&udpCmd, buf, 1024);
-        if (bufcnt <= 0) continue;
-        printf("buf is %s\n",buf);
-        buf[bufcnt] = 0;
-        printf("buf after 0 is %s\n",buf);
-        char c = buf[0];
+	/*
+	ANGLE DISPLACEMENT MESSAGE IS IN buffer
+	USE THIS SECTION TO CONVERT/EXTRACT DISPLACEMENT
+	FROM buffer AND PROCESS IN PID CONTROLLER 
+	*/
 
         if(c=='q') break;
         if(c=='1') {
@@ -214,8 +276,9 @@ int main()
     }
 
     // If the program is done, return 0
-    video_Close(&vid);
-    mot_Close();
+    close(newsockfd); // Close TCP socket
+    video_Close(&vid); // Close video thread
+    mot_Close(); // Close motor thread
     printf("\nDone!\n");
     return 0;
 }
