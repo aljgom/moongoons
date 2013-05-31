@@ -17,7 +17,12 @@ import sys
 
 class Huelock():
 
-    def __init__(self, color_min=(130, 220, 95), color_max=(180, 255, 255)):
+    # airplane conditions (darkness) (150,220,0) to (180, 255, 255)
+    # area threshold 20000000
+
+    # normal conditions (130, 220, 60) to (180, 255, 255)
+    # area threshold 300000
+    def __init__(self, color_min=(150, 220, 0), color_max=(180, 255, 255)):
         # Default colors work to detect red-cup red!
         self.color_min = cv.Scalar(color_min[0], color_min[1], color_min[2])
         self.color_max = cv.Scalar(color_max[0], color_max[1], color_max[2])
@@ -65,6 +70,18 @@ class Huelock():
         else:
             return None
 
+    def get_position(self, image_data, threshold=20000000):
+        center = self.detect_hue(image_data=image_data, threshold=threshold)
+
+        if center:
+            quadrocopter_position = center[0] / float(width)
+            quadrocopter_position = quadrocopter_position * 100 - 50
+
+        else:
+            quadrocopter_position = None
+
+        return quadrocopter_position
+
 
 def cli():
     # Regardless, instantiate an object detector
@@ -72,6 +89,7 @@ def cli():
 
     if len(sys.argv) == 1:
         print "Usage: ./" + str(sys.argv[0]) + " [filename]"
+        print "Usage: ./" + str(sys.argv[0]) + " test [number for threshold]"
 
     else:
         # Live camera display
