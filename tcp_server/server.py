@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 
 import socket
+import subprocess
+import os
+import cv
 import time
 from colortracker import ColorTracker
+
 
 # Open and connect TCP socket
 TCP_IP = '192.168.1.1'
@@ -18,10 +22,18 @@ s.connect((TCP_IP, TCP_PORT))
 image = bytearray(YUV_SIZE)
 packet = bytearray(BUFFER_SIZE)
 
+# Color tracker
 colortracker = ColorTracker()
 
+# Camera display
+cv.NamedWindow("Camera", 1)
+font = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 0.5, 1, 0, 2, 8)
+display_width = 640
+display_height = 480
+
 # Loop indefinitely
-for image_number in range(0, 5):
+image_number = 0
+while True:
 
     START = int(round(time.time() * 1000))
 
@@ -50,15 +62,35 @@ for image_number in range(0, 5):
 
             total_bytes += bytes_recvd
 
-    position = colortracker.get_position(image, threshold=30000)
+    # Write image to file
+    image_file = open('tmp.yuv', 'wb+')
+    image_file.write(image)
+    image_file.close()
+
+    # FFMPEG in silent mode to convert the image
+    ffmpeg_command = ['ffmpeg', '-s', '640x480', '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
+
+    subprocess.call(ffmpeg_command, stdout=open(os.devnull, 'wb'))
+
+    # Now let opencv decompress your image
+    cvimage = cv.LoadImage("tmp.jpg")
+
+    # Put on computer display
+    cv.ShowImage('Camera', cvimage)
+
+    # Escape kills the program
+    # NOTE: waitkey is crucial for refreshing the gui
+    if cv.WaitKey(10) == 27:
+        break
+
+    position = colortracker.get_position(cvimage, threshold=10000)
 
     if position:
         print "Red found, position is " + str(position) + "!"
-    else:
-        print "No red in this frame..."
-    #print "image %d received" % (image_number)
+        print "image %d received" % (image_number)
+        print "time is %d \n\n" % (int(round(time.time() * 1000))-START)
 
+    image_number += 1
 
-    print "time is %d" % (int(round(time.time() * 1000))-START)
 
 print "Execution complete."

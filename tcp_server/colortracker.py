@@ -71,12 +71,14 @@ class ColorTracker():
             return None
 
     def get_position(self, image_data, threshold=20000000):
+        width = cv.GetSize(image_data)[0]
+        height = cv.GetSize(image_data)[1]
+
         center = self.detect_hue(image_data=image_data, threshold=threshold)
 
         if center:
             quadrocopter_position = center[0] / float(width)
             quadrocopter_position = quadrocopter_position * 100 - 50
-
         else:
             quadrocopter_position = None
 
@@ -84,9 +86,10 @@ class ColorTracker():
 
 
 def cli():
-    # Regardless, instantiate an object detector
+    # Instantiate an object detector
     detector = ColorTracker()
 
+    # Usage instructions
     if len(sys.argv) == 1:
         print "Usage: ./" + str(sys.argv[0]) + " [filename]"
         print "Usage: ./" + str(sys.argv[0]) + " test [number for threshold]"
