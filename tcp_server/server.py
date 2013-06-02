@@ -90,6 +90,23 @@ while True:
         print "image %d received" % (image_number)
         print "time is %d \n\n" % (int(round(time.time() * 1000))-START)
 
+
+    	# Pretend Image Processing Algorithm is a float from -50 to 50
+    	ang_dspl = str(int(position))
+
+    	# Output Angle Displacement back to main_motorboard.c
+    	if (len(ang_dspl) != 4):
+            ang_dspl = ang_dspl.zfill(4)
+            bytes_sent = s.send(ang_dspl)
+    	else:
+            bytes_sent = s.send(ang_dspl)
+
+    else:
+	bytes_sent = s.send(str(None))
+
+
+    print "bytes_sent is %d" % (bytes_sent)
+
     image_number += 1
 
 
