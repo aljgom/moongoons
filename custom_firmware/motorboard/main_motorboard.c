@@ -188,31 +188,31 @@ int main()
             sum += n;
         }
 
-		/* 
-		Convert buffer to integer or NULL
-		*/
-		char none[] = "None";
-		int equal = 0;
+	/* 
+	Convert buffer to integer or NULL
+	*/
+	char none[] = "None";
+	int equal = 0;
 		
-		//Check that buffer is "None"
-		int check;
-		for (check=0;check<4;check++) {
-			if (buffer[check]==none[check]) {
-				equal = 1;
-			}
-			else {
-				equal = 0;
-				break;
-			}
-		}
-		
-		// Message received is integer string if not equal
-		if (equal==0) {
-			int ang_dspl = atoi(buffer);
+	//Check that buffer is "None"
+	int check;
+	for (check=0;check<4;check++) {
+		if (buffer[check]==none[check]) {
+			equal = 1;
 		}
 		else {
-			int ang_dspl = NULL;
+			equal = 0;
+			break;
 		}
+	}
+		
+	// Message received is integer string if not equal
+	if (equal==0) {
+		int ang_dspl = atoi(buffer);
+	}
+	else {
+		int ang_dspl = NULL;
+	}
 		
 	/*
 	ANGLE DISPLACEMENT MESSAGE IS IN buffer
