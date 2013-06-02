@@ -40,11 +40,11 @@
 #include "../gpio/gpio.h"
 
 // Motor control
-#include "../udp/udp.h"
 #include "motorboard.h"
 
 // For video stuff
 #include "../video/video.h"
+#include "../video/video.c"
 
 //used to exit and print error message
 void error(const char *msg)
@@ -52,7 +52,6 @@ void error(const char *msg)
     perror(msg);
     exit(0);
 }
-
 
 int main()
 {
@@ -135,10 +134,10 @@ int main()
     while(1) {
         // Get picture into image buffer from video thread
         video_GrabImage(&vid, img_new);
-	unsigned char * image = img_new->buf;
+		unsigned char * image = img_new->buf;
 
-	// Loop to send entire buffer to server
-        char buffer[19];
+		// Loop to send entire buffer to server
+        char buffer[4];
         unsigned char packet[9216];
         int m;
         for (m=0;m<50;m++) {
@@ -154,7 +153,7 @@ int main()
             if (n < 0) {
                 error("ERROR writing to socket");
             }
-
+			
 	    // Make sure all 9216 bytes have been sent
             // If not, resend rest of bytes
             int sum = n;
@@ -164,37 +163,63 @@ int main()
                     error("ERROR reading from socket");
                 }
                 sum += n;
-	    }
-	}
+			}
+		}
 
-	/* 
-	GET ANGLE DISPLACEMENT FROM IMAGE PROCESSING CLIENT
-	*/
+		/* 
+		GET ANGLE DISPLACEMENT FROM IMAGE PROCESSING CLIENT
+		*/
 	
-	// Read message from client
-        bzero(buffer,19);
-        n = read(newsockfd,buffer,19);
+		// Read message from client
+        bzero(buffer,4);
+        n = read(newsockfd,buffer,4);
         if (n < 0) {
             error("ERROR reading from socket");
         }
 
-	//Make sure all 19 bytes have been read
+		//Make sure all 5 bytes have been read
         // If not, reread rest of bytes
         int sum = n;
-        while (sum < 19) {
-            n = read(newsockfd,buffer+sum,19-sum);
+        while (sum < 4) {
+            n = read(newsockfd,buffer+sum,4-sum);
             if (n < 0) {
                 error("ERROR reading from socket");
             }
             sum += n;
         }
 
+	/* 
+	Convert buffer to integer or NULL
+	*/
+	char none[] = "None";
+	int equal = 0;
+		
+	//Check that buffer is "None"
+	int check;
+	for (check=0;check<4;check++) {
+		if (buffer[check]==none[check]) {
+			equal = 1;
+		}
+		else {
+			equal = 0;
+			break;
+		}
+	}
+		
+	// Message received is integer string if not equal
+	if (equal==0) {
+		int ang_dspl = atoi(buffer);
+	}
+	else {
+		int ang_dspl = NULL;
+	}
+		
 	/*
 	ANGLE DISPLACEMENT MESSAGE IS IN buffer
 	USE THIS SECTION TO CONVERT/EXTRACT DISPLACEMENT
 	FROM buffer AND PROCESS IN PID CONTROLLER 
 	*/
-
+		/*
         if(c=='q') break;
         if(c=='1') {
             printf("\rRun Motor1 50%            ");
@@ -272,7 +297,7 @@ int main()
             printf("\rLeds red            ");
             mot_SetLeds(MOT_LEDRED,MOT_LEDRED,MOT_LEDRED,MOT_LEDRED);
         }
-
+		*/
         //yield to other threads
         pthread_yield();
     }
