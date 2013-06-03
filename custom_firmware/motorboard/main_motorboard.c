@@ -75,22 +75,7 @@ float speedSmallPulse = 15;
 int prevAngle;
 clock_t prevTime;
 
-int angleGlobal;/*
-int getAngle(){/*
-	int ang;
-	printf("angle?\n");
-	scanf("%d",&ang);
-	return ang;
-
-	for(int i=0; i<10; i++){
-	  usleep(.2/10*1000000);
-	  checkKeypress();
-    }
-	printf("\nAngle:%i\n",angleGlobal);
-
-	return angleGlobal;
-
-}*/
+int angleGlobal;
 
 void pulse(float dir,float t){
 	if(dir>0)	pulseCounter(t);
@@ -168,19 +153,19 @@ timeval t1, t2;
 int previous_error = 0;
 float integral = 0 ;
 float prevDuration = 0;
+
 void looper(vid_struct * vid, img_struct * img_new, int newsockfd){
 	checkKeypress();
-	/*int angle = getAngle();
-	clock_t time = clock();
+/*clock_t time = clock();
+	int angle = getAngle(vid, img_new,newsockfd);
 	float dir = angle != 0 ? angle/abs(angle) : 0;
-	*/
+*/
 	//printf("dir:%f",dir);
 	//pid would go here
-	printf("looping\n");
-  printf("Angle: %i\n",getAngle(vid, img_new,newsockfd));
-/*
+	
   float dt = .2 + prevDuration;
-  int angle = getAngle();
+  int angle = getAngle(vid, img_new,newsockfd);
+  printf("Angle: %i\n",angle);
   integral = integral + angle*dt;
   float derivative = (angle - previous_error)/dt;
   float output = 1*angle + 1*integral + 1*derivative;
@@ -188,7 +173,7 @@ void looper(vid_struct * vid, img_struct * img_new, int newsockfd){
   smallPulse(-output/abs(output),abs(output)/90*.9); 
   
   prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
-  */
+  
 
 
 	/*
