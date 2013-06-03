@@ -12,16 +12,17 @@ from colortracker import ColorTracker
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=460800, display=False, threshold=10000):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=460800, display=False, threshold=10000, debug=True):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
         self.buffer_size = buffer_size
         self.yuv_size = yuv_size
+	self.debug = debug
 
         # Allocate memory for images and packets
         self.image = bytearray(self.yuv_size)
-        self.packet = bytearray(self.yuv_size)
+        self.packet = bytearray(self.buffer_size)
 
         # Instantiate color tracker
         self.colortracker = ColorTracker()
@@ -49,27 +50,30 @@ class PositionServer():
         while True:
             start_time = int(round(time.time() * 1000))
 
-            # Receive 460800 bytes of data from server
-            bytes_recvd = self.socket.recv_into(self.packet)
-            total_bytes = bytes_recvd
+            # 50 packets for 1 image
+            for packet_number in range(0, 50):
 
-            # TODO: optimize using list slicing
-            for m in range(0, bytes_recvd):
-                index = m
-                self.image[index] = self.packet[m]
+                # Receive 9216 bytes of data from server
+                bytes_recvd = self.socket.recv_into(self.packet)
+                total_bytes = bytes_recvd
 
-            # Make sure all 460800 bytes have been received
-            while (total_bytes < self.yuv_size):
-                packet = bytearray(self.yuv_size - total_bytes)
-                bytes_recvd = self.socket.recv_into(packet)
-
-                # TODO: optimize this, there's definitely a faster way to do this
-                # Copy image data from packet into the image buffer
+                # TODO: optimize using list slicing
                 for m in range(0, bytes_recvd):
-                    index = total_bytes + m
-                    self.image[index] = packet[m]
+                    index = packet_number * self.buffer_size + m
+                    self.image[index] = self.packet[m]
 
-                total_bytes += bytes_recvd
+                # Make sure all 9216 bytes have been received
+                while (total_bytes < self.buffer_size):
+                    packet = bytearray(self.buffer_size - total_bytes)
+                    bytes_recvd = self.socket.recv_into(packet)
+
+                    # TODO: optimize this, there's definitely a faster way to do this
+                    # Copy image data from packet into the image buffer
+                    for m in range(0, bytes_recvd):
+                        index = packet_number * self.buffer_size + total_bytes + m
+                        self.image[index] = packet[m]
+
+                    total_bytes += bytes_recvd
 
             # Write image to file
             image_file = open('tmp.yuv', 'wb+')
@@ -94,11 +98,13 @@ class PositionServer():
 
             position = self.colortracker.get_position(cvimage, threshold=self.threshold)
 
-            print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
+	    if self.debug:
+            	print "image %d received" % (image_number)
+            	print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
+
             if position:
                 # Position found
                 print "Red found, position is " + str(position) + "!"
-                print "image %d received" % (image_number)
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
@@ -112,8 +118,6 @@ class PositionServer():
             else:
                 # No position found, send "None"
                 bytes_sent = self.socket.send(str(None))
-
-            print "bytes_sent is %d" % (bytes_sent)
 
             image_number += 1
 
@@ -146,3 +150,4 @@ def cli():
 
 if __name__ == "__main__":
     cli()
+
