@@ -46,6 +46,13 @@
 #include "../video/video.h"
 #include "../video/video.c"
 
+// Constants
+#define IMAGE_DATA_SIZE 460800
+#define VIDEO_WIDTH 640
+#define VIDEO_HEIGHT 480
+#define NUM_BUFFERS 4
+#define PORT_NUM 7777
+
 //used to exit and print error message
 void error(const char *msg)
 {
@@ -74,10 +81,10 @@ int main()
     vid.device = (char*)"/dev/video0";
 
     // Other params for video
-    vid.w=640;
-    vid.h=480;
-    vid.n_buffers = 4;
-    
+    vid.w = VIDEO_WIDTH;
+    vid.h = VIDEO_HEIGHT;
+    vid.n_buffers = NUM_BUFFERS;
+
     // Initialize video thread for streaming
     video_Init(&vid);
 
@@ -89,7 +96,7 @@ int main()
     Note: AR.Drone is server and listens for connection opening
     IP:192.168.1.1 Port: 7777
     */
-    
+
     // Socket file descriptor, new socket file descriptor, port number
     int sockfd, newsockfd, portno;
     socklen_t clilen;
@@ -97,6 +104,7 @@ int main()
     // Declare additional variables
     struct sockaddr_in serv_addr, cli_addr;
     int n;
+    int sum;
 
     // Open tcp socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -108,7 +116,7 @@ int main()
     bzero((char *) &serv_addr, sizeof(serv_addr));
 
     //set port number
-    portno = 7777;
+    portno = PORT_NUM;
 
     //set parameters for serv_addr
     serv_addr.sin_family = AF_INET;
@@ -130,87 +138,70 @@ int main()
         error("ERROR on accept");
     }
 
-    //Main loop
+    // Main loop
     while(1) {
+
         // Get picture into image buffer from video thread
         video_GrabImage(&vid, img_new);
-		unsigned char * image = img_new->buf;
+        unsigned char * image = img_new->buf;
 
         // Loop to send entire buffer to server
         char buffer[4];
 
-	// Send packet to client
-	n = write(newsockfd,image,460800);//strlen(packet)
-	if (n < 0) {
-		error("ERROR writing to socket");
-	}
-
-	// Make sure all 460000 bytes have been sent
-	// If not, resend rest of bytes
-	int sum = n;
-	while (sum < 460800) {
-		n = write(newsockfd,image+sum,460800-sum);
-		if (n < 0) {
-			error("ERROR reading from socket");
-		}
-		printf("resend %d bytes\n",n);
-		sum += n;
-	}
-		
-	/* 
-	GET ANGLE DISPLACEMENT FROM IMAGE PROCESSING CLIENT
-	*/
-	
-	// Read message from client
-        bzero(buffer,4);
-        n = read(newsockfd,buffer,4);
-        if (n < 0) {
-            error("ERROR reading from socket");
+        // Send packet to client
+        n = 0
+        sum = 0;
+        while (sum < IMAGE_DATA_SIZE) {
+            n = write(newsockfd, image + sum, IMAGE_DATA_SIZE - sum);
+            if (n < 0) {
+                error("ERROR reading image data from socket!");
+            }
+            printf("resend %d bytes\n",n);
+            sum += n;
         }
 
-        //Make sure all 5 bytes have been read
-        // If not, reread rest of bytes
-        sum = n;
+        // Read 4 character message from client
+        bzero(buffer,4);
+        n = 0
+        sum = 0;
         while (sum < 4) {
-            n = read(newsockfd,buffer+sum,4-sum);
+            n = read(newsockfd, buffer + sum, 4 - sum);
+
             if (n < 0) {
-                error("ERROR reading from socket");
+                error("ERROR reading client message!");
             }
             sum += n;
         }
 
-		/* 
-		Convert buffer to integer or NULL
-		*/
-		char none[] = "None";
-		int equal = 0;
-		
-		//Check that buffer is "None"
-		int check;
-		for (check=0;check<4;check++) {
-			if (buffer[check]==none[check]) {
-				equal = 1;
-			}
-			else {
-				equal = 0;
-				break;
-			}
-		}
-		
-		// Message received is integer string if not equal
-		if (equal==0) {
-			int ang_dspl = atoi(buffer);
-		}
-		else {
-			int ang_dspl = NULL;
-		}
-		
-	/*
-	ANGLE DISPLACEMENT MESSAGE IS IN buffer
-	USE THIS SECTION TO CONVERT/EXTRACT DISPLACEMENT
-	FROM buffer AND PROCESS IN PID CONTROLLER 
-	*/
-		/*
+        // Convert buffer to integer or NULL
+        char none[] = "None";
+        int equal = 0;
+
+        //Check that buffer is "None"
+        int check;
+        for (check=0;check<4;check++) {
+            if (buffer[check]==none[check]) {
+                equal = 1;
+            }
+            else {
+                equal = 0;
+                break;
+            }
+        }
+
+        // Message received is integer string if not equal
+        if (equal==0) {
+            int ang_dspl = atoi(buffer);
+        }
+        else {
+            int ang_dspl = NULL;
+        }
+
+        // ANGLE DISPLACEMENT MESSAGE IS IN buffer
+        // USE THIS SECTION TO CONVERT/EXTRACT DISPLACEMENT
+        // FROM buffer AND PROCESS IN PID CONTROLLER
+
+        /*
         if(c=='q') break;
         if(c=='1') {
             printf("\rRun Motor1 50%            ");
@@ -289,14 +280,17 @@ int main()
             mot_SetLeds(MOT_LEDRED,MOT_LEDRED,MOT_LEDRED,MOT_LEDRED);
         }
         */
+
         //yield to other threads
         pthread_yield();
     }
 
-    // If the program is done, return 0
+    // If the program is done, clean up and return 0
+
     close(newsockfd); // Close TCP socket
     video_Close(&vid); // Close video thread
     mot_Close(); // Close motor thread
     printf("\nDone!\n");
+
     return 0;
 }
