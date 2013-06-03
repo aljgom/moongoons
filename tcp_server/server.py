@@ -59,12 +59,12 @@ class PositionServer():
                 # TODO: optimize using list slicing
                 for m in range(0, bytes_recvd):
                     index = packet_number * self.buffer_size + m
-                    self.image[index] = packet[m]
+                    self.image[index] = self.packet[m]
 
                 # Make sure all 9216 bytes have been received
                 while (total_bytes < self.buffer_size):
                     packet = bytearray(self.buffer_size - total_bytes)
-                    bytes_recvd = self.socket.recv_into(self.packet)
+                    bytes_recvd = self.socket.recv_into(packet)
 
                     # TODO: optimize this, there's definitely a faster way to do this
                     # Copy image data from packet into the image buffer
@@ -114,7 +114,7 @@ class PositionServer():
                     bytes_sent = self.socket.send(ang_dspl)
             else:
                 # No position found, send "None"
-                bytes_sent = s.send(str(None))
+                bytes_sent = self.socket.send(str(None))
 
             print "bytes_sent is %d" % (bytes_sent)
 
