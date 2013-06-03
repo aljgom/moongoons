@@ -12,12 +12,13 @@ from colortracker import ColorTracker
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=460800, display=False, threshold=10000):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=460800, display=False, threshold=10000, debug=True):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
         self.buffer_size = buffer_size
         self.yuv_size = yuv_size
+	self.debug = debug
 
         # Allocate memory for images and packets
         self.image = bytearray(self.yuv_size)
@@ -97,11 +98,13 @@ class PositionServer():
 
             position = self.colortracker.get_position(cvimage, threshold=self.threshold)
 
+	    if self.debug:
+            	print "image %d received" % (image_number)
+            	print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
+
             if position:
                 # Position found
                 print "Red found, position is " + str(position) + "!"
-                print "image %d received" % (image_number)
-                print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
@@ -115,8 +118,6 @@ class PositionServer():
             else:
                 # No position found, send "None"
                 bytes_sent = self.socket.send(str(None))
-
-            print "bytes_sent is %d" % (bytes_sent)
 
             image_number += 1
 
