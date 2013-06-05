@@ -44,7 +44,7 @@ void pulseCW(float t);
 void pulseCCW(float t);
 void turnOnCW();
 void turnOnCCW();
-int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd);
+int getAngle();
 void checkKeypress();
 
 #endif

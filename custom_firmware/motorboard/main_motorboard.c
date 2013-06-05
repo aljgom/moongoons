@@ -178,7 +178,7 @@ void smallPulse(float dir,float angle){
 
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
-    float duration = 9; //1.1
+    float duration = .9; //1.1
     mot_Run(.01,0,.01,0);
     if( t < duration)   usleep(t*1000000);
     else            usleep(duration*1000000);
@@ -188,13 +188,14 @@ void smallPulseCW(float t){  //starts with a pulse, then lowers speed
 
 // Small counterclockwise motor pulse
 void smallPulseCCW(float t){
-    float duration = 9; //1.1
+    float duration = .9; //1.1
     mot_Run(0,t,0,t);
     if( t < duration)   usleep(t*1000000);
     else                usleep(duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(0,.01,0,.01);
 }
+
 
 void looper(){
     // First thing: check for user input
@@ -346,7 +347,8 @@ void * process_images(void * param)
     // Buffer for message passing info
     char buffer[4];
 
-     // Video fetching struct
+
+    // Initialize getting a picture
     vid_struct vid;
 
     // Device location
@@ -443,6 +445,7 @@ void * process_images(void * param)
             sum += n;
         }
 
+
         // Convert buffer to integer or NULL
         char none[] = "None";
         int equality = 0;
@@ -476,6 +479,7 @@ void * process_images(void * param)
         // Relinquish CPU before starting again
         pthread_yield();
     }
+
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -490,21 +494,50 @@ int main()
     printf("Start of Control\r\n");
     mot_Init();
 
-    // int angle = getAngle();
-    // printf("Angle: %i\r\n",angle);
-
     // Kick off value getting thing in a separate thread!
     pthread_create(&image_processing_thread, NULL, process_images, NULL);
 
-    // PID Loop
+
+	int angle = getAngle();
+    printf("Angle: %i\r\n",angle);
+
+    int dir = angle != 0 ? angle/abs(angle) : 0;
+    /*
+    //first pulse
+    pulse(dir,pulseDuration);
+
+    printf("Wait: %f\r\n",wait(angle)*1000000);
+    for(int i=0; i<100; i++){
+        usleep(wait(angle)/100*1000000);
+        checkKeypress();
+    }
+    pulse(-dir,pulseDuration -.04);
+    */
+
+	prevAngle = angle; 
+	// start timer
+    gettimeofday(&t1, NULL);
+
+	// PID Loop
+	float s = .1;
+	dir= 1;
     while(1) {
-        // Check for user keypress
-        if(stopLoop) {
-            break;
-        }
-        else {
-            looper();
-        }
+		checkKeypress(); 
+		if(stopLoop) break;
+        //looper(&vid, img_new,newsockfd);
+		smallPulse(dir,.9);
+		usleep(s * 1000000);
+		smallPulse(dir,.9);
+		usleep(1.5 * 1000000);
+		printf("%f\n",s);
+		if(dir > 0) dir = -1; else dir = 1;
+		s+=.05;
+		smallPulse(dir,.9);
+		usleep(s * 1000000);
+		smallPulse(dir,.9);
+		usleep(1.5 * 1000000);
+		printf("%f\n",s);
+		s+=.05;
 
         //yield to other threads
         pthread_yield();
