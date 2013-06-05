@@ -62,6 +62,7 @@ int minAAccel = pulseAAccel/3;
 
 int minLAccel = k*minAAccel;
 bool correctError = true;
+bool stopLoop = false;
 
 float throttle1 = 0.06;
 float throttle2 = 0;
@@ -84,11 +85,6 @@ int angleGlobal;
 void pulse(float dir,float t){
     if(dir>0)   pulseCCW(t);
     else        pulseCW(t);
-}
-
-void smallPulse(float dir,float angle){
-    if(dir>0)   smallPulseCCW(abs(angle));
-    else        smallPulseCW(abs(angle));
 }
 
 void turnOn(float dir){
@@ -153,6 +149,11 @@ void turnOnCCW(){
     mot_Run(0,.01,0,.01);
 }
 
+void smallPulse(float dir,float angle){
+    if(dir>0)   smallPulseCCW(abs(angle));
+    else        smallPulseCW(abs(angle));
+}
+
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
     float duration = 9; //1.1
@@ -181,20 +182,27 @@ void looper(vid_struct * vid, img_struct * img_new, int newsockfd){
 */
 	//printf("dir:%f",dir);
 	//pid would go here
-	
-  float dt = .2 + prevDuration;
-  int angle = getAngle(vid, img_new,newsockfd);
-  printf("Angle: %i\n",angle);
-  integral = integral + angle*dt;
-  float derivative = (angle - previous_error)/dt;
-  float output = 1*angle + 1*integral + 1*derivative;
-  previous_error = angle;
-  printf("smallPulse(%f,%f)",-output/abs(output),abs(output)/90*.9);
-  smallPulse(-output/abs(output),abs(output)/90*.9); 
+  printf("\n");
+  
+  float dt=.4;
+  int angle = getAngle(vid, img_new,newsockfd);	
+  printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);	  
+  if(angle == 9999) return;
+  float vel = prevAngle == 9999 ? 0 : (float)(angle - prevAngle)/(dt);//( (float)(time - prevTime)/CLOCKS_PER_SEC );
+  printf("Vel: %f\n",vel);	  
+  float error = vel - ( - 2 * angle/50 );	  
+  integral = integral*.5 + error*dt;
+  float derivative = (error - previous_error)/dt;
+  float output = - 1.5*error; // - 1*integral //- 1*derivative/dt;
+  printf("Error: %f       Output: %f\n",error,output);	 
+  previous_error = error;
+  float dir = output == 0 ? 0 : -output/abs(output);
+  float pulseStrength=abs(output);///90;//*.9);;
+  printf("smallPulse(%f,%f)\n",dir,pulseStrength);
+  //smallPulse(dir,pulseStrength;); 
   
   prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
-  
-
+  prevAngle = angle;
 
 	/*
 
@@ -246,7 +254,7 @@ void looper(vid_struct * vid, img_struct * img_new, int newsockfd){
 void checkKeypress(){
     int c=tolower(util_getch());
 
-    //if(c=='q') break;
+    if(c=='q') stopLoop = true;
 
     if(c=='1') {
         printf("\rCounterclockwise pulse\n");
@@ -501,6 +509,7 @@ int main()
 
     //main loop
     while(1) {
+		if(stopLoop) break;
         looper(&vid, img_new,newsockfd);
 
         //yield to other threads
@@ -508,6 +517,7 @@ int main()
     }
 
     // Cleanup
+	close(sockfd);
     close(newsockfd); // Close TCP socket
     video_Close(&vid); // Close video thread
     mot_Close(); // Close motor thread
