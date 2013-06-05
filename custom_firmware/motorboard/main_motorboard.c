@@ -46,9 +46,18 @@ pthread_mutex_t video_results_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // SHARED THREAD VARS
 int position_value = 9999;
+time_t img_recv_timestamp;
 
- // Global pthread for fetching image detection values
+
+// Global pthread for fetching image detection values
 pthread_t image_processing_thread;
+
+// Structure for retrieving both shared numbers at once as a pair
+typedef struct
+{
+    int position;
+    time_t timestamp;
+} PositionTimePair;
 
 /*****************************************************************/
 /*****************************************************************/
@@ -172,7 +181,7 @@ void turnOnCCW(){
 }
 
 void smallPulse(float dir,float duration){
-	printf("dir %f,  duration %f\n",dir);
+    printf("dir %f,  duration %f\n",dir);
     if(dir>0)   smallPulseCCW(duration);
     else        smallPulseCW(duration);
 }
@@ -198,7 +207,7 @@ void smallPulseCCW(float t){
 }
 
 
-void looper(){
+void pid_controller(){
     // First thing: check for user input
     checkKeypress();
     printf("\n");
@@ -226,10 +235,10 @@ void looper(){
     previous_error = error;
     float dir = output == 0 ? 0 : output/abs(output);
     float pulseStrength=output > 0? output : -output; // abs() not working?
-	pulseStrength = pulseStrength/9*.9;
+    pulseStrength = pulseStrength/9*.9;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
     smallPulse(dir,pulseStrength);
-	usleep(.1 * 1000000);
+    usleep(.1 * 1000000);
 
     prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
     prevAngle = angle;
@@ -330,13 +339,49 @@ int getAngle()
         // Retrieve the value
         angle = position_value;
 
-        // Add retrieving timestamp stuff...
 
     // Unlock
     pthread_mutex_unlock(&video_results_mutex);
 
     // Returns 9999 if no angle found, otherwise returns between -50 and 50
     return angle;
+}
+
+// Gets the value and timestamp returned by the video
+PositionTimePair getPositionAndTimestamp()
+{
+    PositionTimePair pos_time_pair;
+
+    // Lock the value mutex
+    pthread_mutex_lock(&video_results_mutex);
+
+        // Retrieve the value
+        pos_time_pair.timestamp = img_recv_timestamp;
+        pos_time_pair.position = position_value;
+
+    // Unlock
+    pthread_mutex_unlock(&video_results_mutex);
+
+    // Returns a struct containing the last known position and timestamp
+    return pos_time_pair;
+}
+
+// Get the time elapsed since last image in *SECONDS*
+double getTimeSinceLastImage()
+{
+    double timeSinceLastImage = 0.0;
+    // Lock the value mutex
+    pthread_mutex_lock(&video_results_mutex);
+
+    // Generate nowtime
+    time_t now;
+    time(&now);
+
+    // Calculate difference in times
+    timeSinceLastImage = difftime(now, img_recv_timestamp);
+
+    pthread_mutex_unlock(&video_results_mutex);
+    return timeSinceLastImage;
 }
 
 void * process_images(void * param)
@@ -467,15 +512,17 @@ void * process_images(void * param)
 
         // Message received is integer string if not equal
         if (equality==0) {
-            // Lock the position value and update it
+            // Lock the position value and update it + timestamp
             pthread_mutex_lock(&video_results_mutex);
             position_value = atoi(buffer);
+            time(&img_recv_timestamp);
             pthread_mutex_unlock(&video_results_mutex);
         }
         else {
             // Lock the position value and update it
             pthread_mutex_lock(&video_results_mutex);
             position_value = 9999;
+            time(&img_recv_timestamp);
             pthread_mutex_unlock(&video_results_mutex);
         }
 
@@ -501,7 +548,7 @@ int main()
     pthread_create(&image_processing_thread, NULL, process_images, NULL);
 
 
-	int angle = getAngle();
+    int angle = getAngle();
     printf("Angle: %i\r\n",angle);
 
     int dir = angle != 0 ? angle/abs(angle) : 0;
@@ -517,30 +564,30 @@ int main()
     pulse(-dir,pulseDuration -.04);
     */
 
-	prevAngle = angle; 
-	// start timer
+    prevAngle = angle;
+    // start timer
     gettimeofday(&t1, NULL);
 
-	// PID Loop
-	float s = .01;
-	dir= 1;
+    // PID Loop
+    float s = .01;
+    dir= 1;
     while(1) {
-		checkKeypress(); 
-		if(stopLoop) break;
-        looper();
-/*		smallPulse(dir,.9);
-		usleep(s * 1000000);
-		smallPulse(dir,.9);
-		usleep(1.5 * 1000000);
-		printf("%f\n",s);
-		if(dir > 0) dir = -1; else dir = 1;
-		s+=.01;
-		smallPulse(dir,.9);
-		usleep(s * 1000000);
-		smallPulse(dir,.9);
-		usleep(1.5 * 1000000);
-		printf("%f\n",s);
-		s+=.01;
+        checkKeypress();
+        if(stopLoop) break;
+        pid_controller();
+/*      smallPulse(dir,.9);
+        usleep(s * 1000000);
+        smallPulse(dir,.9);
+        usleep(1.5 * 1000000);
+        printf("%f\n",s);
+        if(dir > 0) dir = -1; else dir = 1;
+        s+=.01;
+        smallPulse(dir,.9);
+        usleep(s * 1000000);
+        smallPulse(dir,.9);
+        usleep(1.5 * 1000000);
+        printf("%f\n",s);
+        s+=.01;
 */
         //yield to other threads
         pthread_yield();
