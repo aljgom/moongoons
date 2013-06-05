@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import cv
+import cProfile
 import os
 import socket
 import subprocess
@@ -12,7 +13,7 @@ from colortracker import ColorTracker
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=460800, display=False, threshold=10000):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
@@ -26,6 +27,9 @@ class PositionServer():
         # Instantiate color tracker
         self.colortracker = ColorTracker()
 
+        # Flipping the value signs
+        self.flip = flip
+
         # Display initialization
         self.display = display
 
@@ -36,8 +40,8 @@ class PositionServer():
         if self.display:
             cv.NamedWindow("Camera", 1)
             self.cvfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 0.5, 1, 0, 2, 8)
-            self.display_width = 640
-            self.display_height = 480
+            self.width = img_width
+            self.height = img_height
 
     def connect(self):
         # Create socket connection
@@ -49,7 +53,7 @@ class PositionServer():
         while True:
             start_time = int(round(time.time() * 1000))
 
-            # Receive 460800 bytes of data from server
+            # Receive yuv_size bytes of data from server
             bytes_recvd = self.socket.recv_into(self.packet)
             total_bytes = bytes_recvd
 
@@ -58,7 +62,7 @@ class PositionServer():
                 index = m
                 self.image[index] = self.packet[m]
 
-            # Make sure all 460800 bytes have been received
+            # Make sure all yuv_size bytes have been received
             while (total_bytes < self.yuv_size):
                 packet = bytearray(self.yuv_size - total_bytes)
                 bytes_recvd = self.socket.recv_into(packet)
@@ -77,7 +81,7 @@ class PositionServer():
             image_file.close()
 
             # FFMPEG in silent mode to convert the image
-            ffmpeg_command = ['ffmpeg', '-s', '640x480', '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
+            ffmpeg_command = ['ffmpeg', '-s', str(self.width) + "x" + str(self.height), '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
 
             subprocess.call(ffmpeg_command, stdout=open(os.devnull, 'wb'))
 
@@ -102,6 +106,11 @@ class PositionServer():
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
+
+                # Some cameras flip the image. Unflip the value for more
+                # conventiona signage.
+		if self.flip:
+		    ang_dspl *= -1
 
                 # Send angular displacement back to the AR Drone
                 if (len(ang_dspl) != 4):
