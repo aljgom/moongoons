@@ -1,5 +1,4 @@
-/*
-    main_motorboard.c - AR.Drone motor demo program
+/* main_motorboard.c - AR.Drone motor demo program
 
     Copyright (C) 2011 Hugo Perquin - http://blog.perquin.com
 
@@ -37,7 +36,6 @@
 #include <arpa/inet.h>
 
 // Constants
-#define IMAGE_DATA_SIZE 460800
 #define VIDEO_WIDTH 640
 #define VIDEO_HEIGHT 480
 #define NUM_BUFFERS 4
@@ -80,6 +78,16 @@ float integral = 0 ;
 float prevDuration = 0;
 
 int angleGlobal;
+
+// Declare global variables for chopping image
+double percent = 0.20;
+int y_upper = VIDEO_WIDTH*VIDEO_HEIGHT/2*(1-percent);
+int y_lower = VIDEO_WIDTH*VIDEO_HEIGHT/2*(1+percent)-1;
+int cr_upper = VIDEO_WIDTH*VIDEO_HEIGHT/8*(9-percent);
+int cr_lower = VIDEO_WIDTH*VIDEO_HEIGHT/8*(9+percent)-1;
+int cb_upper = VIDEO_WIDTH*VIDEO_HEIGHT/8*(11-percent);
+int cb_lower = VIDEO_WIDTH*VIDEO_HEIGHT/8*(11+percent)-1;
+int chopped_size = (y_lower-y_upper+1)+(cr_lower-cr_upper+1)+(cb_lower-cb_upper+1);
 
 // Motor Control Functions
 void pulse(float dir,float t){
@@ -343,15 +351,24 @@ int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd)
     int sum;
     // Get picture into image buffer from video thread
     video_GrabImage(vid, img_new);
-    unsigned char * image = img_new->buf;
+    unsigned char * buf1 = img_new->buf;
+
+    // Set image buffer
+    unsigned char image[chopped_size];
+		
+    // Copy over data from buf1 to image
+    memcpy(image,buf1+y_upper,y_lower-y_upper+1); // Copy Y values
+    memcpy(image+(y_lower-y_upper+1),buf1+cr_upper,cr_lower-cr_upper+1); // Copy Cr values
+    memcpy(image+(y_lower-y_upper+1)+(cr_lower-cr_upper+1),buf1+cb_upper,cb_lower-cb_upper+1); // Copy Cb values
+
     // Loop to send entire buffer to server
     char buffer[4];
 
     // Send packet to client
     n = 0;
     sum = 0;
-    while (sum < IMAGE_DATA_SIZE) {
-        n = write(newsockfd, image + sum, IMAGE_DATA_SIZE - sum);
+    while (sum < chopped_size) {
+        n = write(newsockfd, image + sum, chopped_size - sum);
         if (n < 0) {
             error("ERROR reading image data from socket!");
         }
@@ -468,7 +485,6 @@ int main()
         error("ERROR on accept");
     }
 
-    printf("1\n");
     int angle = getAngle(&vid, img_new,newsockfd);
     printf("Angle: %i\r\n",angle);
 
