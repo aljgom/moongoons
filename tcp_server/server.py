@@ -102,14 +102,14 @@ class PositionServer():
 
             print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
             if position:
-                # Position found
-                print "Red found, position is " + str(position) + "!"
-                print "image %d received" % (image_number)
-
                 # Some cameras flip the image. Unflip the value for more
                 # conventiona signage.
                 if self.flip:
                     position *= -1
+
+                # Position found
+                print "Red found, position is " + str(position) + "!"
+                print "image %d received" % (image_number)
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
@@ -124,8 +124,6 @@ class PositionServer():
             else:
                 # No position found, send "None"
                 bytes_sent = self.socket.send(str(None))
-
-            print "bytes_sent is %d" % (bytes_sent)
 
             image_number += 1
 
