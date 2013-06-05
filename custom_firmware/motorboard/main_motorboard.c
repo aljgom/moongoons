@@ -171,9 +171,10 @@ void turnOnCCW(){
     mot_Run(0,.01,0,.01);
 }
 
-void smallPulse(float dir,float angle){
-    if(dir>0)   smallPulseCCW(abs(angle));
-    else        smallPulseCW(abs(angle));
+void smallPulse(float dir,float duration){
+	printf("dir %f,  duration %f\n",dir);
+    if(dir>0)   smallPulseCCW(duration);
+    else        smallPulseCW(duration);
 }
 
 // Small clockwise motor pulse
@@ -215,18 +216,20 @@ void looper(){
     printf("Vel: %f\n",vel);
 
     // Error Calculation
-    float error = vel - ( - 2 * angle/50 );
+    float error = vel - ( - 2 * float(angle)/50 );
     integral = integral*.5 + error*dt;
     float derivative = (error - previous_error)/dt;
-    float output = - 1.5*error; // - 1*integral //- 1*derivative/dt;
+    float output =  -1.5*error; // - 1*integral //- 1*derivative/dt;
     printf("Error: %f       Output: %f\n",error,output);
 
     // Print what pulse was given as a response
     previous_error = error;
-    float dir = output == 0 ? 0 : -output/abs(output);
-    float pulseStrength=abs(output);///90;//*.9);;
+    float dir = output == 0 ? 0 : output/abs(output);
+    float pulseStrength=output > 0? output : -output; // abs() not working?
+	pulseStrength = pulseStrength/9*.9;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
-    //smallPulse(dir,pulseStrength;);
+    smallPulse(dir,pulseStrength);
+	usleep(.1 * 1000000);
 
     prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
     prevAngle = angle;
@@ -519,26 +522,26 @@ int main()
     gettimeofday(&t1, NULL);
 
 	// PID Loop
-	float s = .1;
+	float s = .01;
 	dir= 1;
     while(1) {
 		checkKeypress(); 
 		if(stopLoop) break;
-        //looper(&vid, img_new,newsockfd);
-		smallPulse(dir,.9);
+        looper();
+/*		smallPulse(dir,.9);
 		usleep(s * 1000000);
 		smallPulse(dir,.9);
 		usleep(1.5 * 1000000);
 		printf("%f\n",s);
 		if(dir > 0) dir = -1; else dir = 1;
-		s+=.05;
+		s+=.01;
 		smallPulse(dir,.9);
 		usleep(s * 1000000);
 		smallPulse(dir,.9);
 		usleep(1.5 * 1000000);
 		printf("%f\n",s);
-		s+=.05;
-
+		s+=.01;
+*/
         //yield to other threads
         pthread_yield();
     }
