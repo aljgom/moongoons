@@ -11,6 +11,7 @@ import time
 from colortracker import ColorTracker
 
 
+
 class PositionServer():
 
     def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True):
