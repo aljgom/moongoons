@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import cv
+import cProfile
 import os
 import socket
 import subprocess
@@ -13,7 +14,7 @@ from colortracker import ColorTracker
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=460800, display=False, threshold=10000):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
@@ -22,10 +23,13 @@ class PositionServer():
 
         # Allocate memory for images and packets
         self.image = bytearray(self.yuv_size)
-        self.packet = bytearray(self.buffer_size)
+        self.packet = bytearray(self.yuv_size)
 
         # Instantiate color tracker
         self.colortracker = ColorTracker()
+
+        # Flipping the value signs
+        self.flip = flip
 
         # Display initialization
         self.display = display
@@ -37,8 +41,8 @@ class PositionServer():
         if self.display:
             cv.NamedWindow("Camera", 1)
             self.cvfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 0.5, 1, 0, 2, 8)
-            self.display_width = 640
-            self.display_height = 480
+            self.width = img_width
+            self.height = img_height
 
     def connect(self):
         # Create socket connection
@@ -50,30 +54,27 @@ class PositionServer():
         while True:
             start_time = int(round(time.time() * 1000))
 
-            # 50 packets for 1 image
-            for packet_number in range(0, 50):
+            # Receive yuv_size bytes of data from server
+            bytes_recvd = self.socket.recv_into(self.packet)
+            total_bytes = bytes_recvd
 
-                # Receive 9216 bytes of data from server
-                bytes_recvd = self.socket.recv_into(self.packet)
-                total_bytes = bytes_recvd
+            # TODO: optimize using list slicing
+            for m in range(0, bytes_recvd):
+                index = m
+                self.image[index] = self.packet[m]
 
-                # TODO: optimize using list slicing
+            # Make sure all yuv_size bytes have been received
+            while (total_bytes < self.yuv_size):
+                packet = bytearray(self.yuv_size - total_bytes)
+                bytes_recvd = self.socket.recv_into(packet)
+
+                # TODO: optimize this, there's definitely a faster way to do this
+                # Copy image data from packet into the image buffer
                 for m in range(0, bytes_recvd):
-                    index = packet_number * self.buffer_size + m
-                    self.image[index] = self.packet[m]
+                    index = total_bytes + m
+                    self.image[index] = packet[m]
 
-                # Make sure all 9216 bytes have been received
-                while (total_bytes < self.buffer_size):
-                    packet = bytearray(self.buffer_size - total_bytes)
-                    bytes_recvd = self.socket.recv_into(packet)
-
-                    # TODO: optimize this, there's definitely a faster way to do this
-                    # Copy image data from packet into the image buffer
-                    for m in range(0, bytes_recvd):
-                        index = packet_number * self.buffer_size + total_bytes + m
-                        self.image[index] = packet[m]
-
-                    total_bytes += bytes_recvd
+                total_bytes += bytes_recvd
 
             # Write image to file
             image_file = open('tmp.yuv', 'wb+')
@@ -81,7 +82,7 @@ class PositionServer():
             image_file.close()
 
             # FFMPEG in silent mode to convert the image
-            ffmpeg_command = ['ffmpeg', '-s', '640x480', '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
+            ffmpeg_command = ['ffmpeg', '-s', str(self.width) + "x" + str(self.height), '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
 
             subprocess.call(ffmpeg_command, stdout=open(os.devnull, 'wb'))
 
@@ -98,14 +99,19 @@ class PositionServer():
 
             position = self.colortracker.get_position(cvimage, threshold=self.threshold)
 
+            print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
             if position:
                 # Position found
                 print "Red found, position is " + str(position) + "!"
                 print "image %d received" % (image_number)
-                print "time is %d \n\n" % (int(round(time.time() * 1000)) - start_time)
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
+
+                # Some cameras flip the image. Unflip the value for more
+                # conventiona signage.
+		if self.flip:
+		    ang_dspl *= -1
 
                 # Send angular displacement back to the AR Drone
                 if (len(ang_dspl) != 4):
