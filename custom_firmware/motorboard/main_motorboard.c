@@ -216,8 +216,8 @@ void smallPulseCCW(float t){
 	if (t < 0.8)	t = min_duration;
 	
 	//mot_Run(0,.01,0,.01);
-    if(cCWSwitcher) mot_Run(0,0,.01,0);
-	else mot_Run(.01,0,0,0);
+    if(cCWSwitcher) mot_Run(0,0,0,0.01);
+	else mot_Run(0,0.01,0,0);
 	cCWSwitcher = !cCWSwitcher;
 	if( t < max_duration)   usleep(t*1000000);
 
@@ -247,8 +247,8 @@ void pid_controller(){
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
     if(angle == 9999){
-        counter = (counter+1)%3;
-        if(counter == 0)smallPulse(1,1.5);
+        counter = (counter+1)%5;
+        if(counter == 4)smallPulse(1,1.5);
         return;
     }
     // Velocity Calculation
@@ -260,14 +260,14 @@ void pid_controller(){
     float error = vel - ( - 2 * float(angle)/50 );
     integral = integral*.5 + error*dt;
     float derivative = (error - previous_error)/dt;
-    float output =  -2*error ;//- 1*integral - 1*derivative/dt;
+    float output =  -2*error - 1*integral - 1*derivative/dt;
     printf("Error: %f       Output: %f\n",error,output);
 
     // Print what pulse was given as a response
     previous_error = error;
     float dir = output == 0 ? 0 : output/abs(output);
     float pulseStrength = output > 0? output : -output; // abs() not working?
-    pulseStrength = pulseStrength/9*.9;
+    pulseStrength = pulseStrength/70 * .7 +.8;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
     smallPulse(dir,pulseStrength);
     //usleep(.1 * 1000000);
