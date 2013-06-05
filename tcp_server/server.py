@@ -106,13 +106,14 @@ class PositionServer():
                 print "Red found, position is " + str(position) + "!"
                 print "image %d received" % (image_number)
 
+                # Some cameras flip the image. Unflip the value for more
+                # conventiona signage.
+                if self.flip:
+                    ang_dspl *= -1
+
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
 
-                # Some cameras flip the image. Unflip the value for more
-                # conventiona signage.
-		if self.flip:
-		    ang_dspl *= -1
 
                 # Send angular displacement back to the AR Drone
                 if (len(ang_dspl) != 4):
