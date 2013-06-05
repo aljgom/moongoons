@@ -153,16 +153,21 @@ float smallWait(float angle){
 }
 
 // Pulse motors such that drone moves clockwise
+bool cWSwitcher = true;
+bool cCWSwitcher = false;
 void pulseCW(float t){
-    mot_Run(.01,0,.01,0);
+    //mot_Run(.01,0,.01,0);
+	if(cWSwitcher) mot_Run(0,0,.01,0);
+	else mot_Run(.01,0,0,0);
+	cWSwitcher = !cWSwitcher;
     usleep(t*1000000);
-    mot_Run(0,0,0,0);
+    mot_Run(0,0,0,0);	
 }
 
 // Pulse motors such that drone moves counterclockwise
 void pulseCCW(float t){
-    mot_Run(0,.01,0,.01);
-    usleep(t*1000000);
+	mot_Run(0,.01,0,.01);
+	usleep(t*1000000);
     mot_Run(0,0,0,0);
 }
 
@@ -192,8 +197,11 @@ void smallPulseCW(float t){  //starts with a pulse, then lowers speed
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 
-    mot_Run(.01,0,.01,0);
-    if( t < max_duration)   usleep(t*1000000);
+    //mot_Run(.01,0,.01,0);
+    if(cWSwitcher) mot_Run(0,0,.01,0);
+	else mot_Run(.01,0,0,0);
+	cWSwitcher = !cWSwitcher;
+	if( t < max_duration)   usleep(t*1000000);
     else            usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(.01,0,.01,0);
@@ -207,8 +215,11 @@ void smallPulseCCW(float t){
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 	
-	mot_Run(0,.01,0,.01);
-    if( t < max_duration)   usleep(t*1000000);
+	//mot_Run(0,.01,0,.01);
+    if(cCWSwitcher) mot_Run(0,0,.01,0);
+	else mot_Run(.01,0,0,0);
+	cCWSwitcher = !cCWSwitcher;
+	if( t < max_duration)   usleep(t*1000000);
     else                usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(0,.01,0,.01);
@@ -248,7 +259,7 @@ void pid_controller(){
     float error = vel - ( - 2 * float(angle)/50 );
     integral = integral*.5 + error*dt;
     float derivative = (error - previous_error)/dt;
-    float output =  -2*error; // - 1*integral //- 1*derivative/dt;
+    float output =  -2*error ;//- 1*integral - 1*derivative/dt;
     printf("Error: %f       Output: %f\n",error,output);
 
     // Print what pulse was given as a response
@@ -258,7 +269,7 @@ void pid_controller(){
     pulseStrength = pulseStrength/9*.9;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
     smallPulse(dir,pulseStrength);
-    usleep(.1 * 1000000);
+    //usleep(.1 * 1000000);
 
     prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
     prevAngle = angle;
