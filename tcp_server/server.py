@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import cv
+import cProfile
 import os
 import socket
 import subprocess
