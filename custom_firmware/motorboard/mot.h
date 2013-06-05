@@ -23,6 +23,7 @@
 
 #include "../util/type.h"
 #include "motorboard.h"
+#include "../video/video.h"
 
 int mot_Init();
 void mot_SetLed(u08 mot_id, u08 led);
@@ -31,5 +32,19 @@ void mot_Stop();
 void mot_Run(float m0, float m1, float m2, float m3);
 void mot_GetMot(float *m);
 void mot_Close();
+void pulse(float dir,float t);
+void smallPulseClock(float increase);
+void smallPulseCounter(float increase);
+void smallPulse(float dir,float angle);
+void turnOn(float dir);
+void looper(vid_struct * vid, img_struct * img_new, int newsockfd);
+float wait(float angle);
+float smallWait(float angle);
+void pulseClock(float t);
+void pulseCounter(float t);
+void turnOnClock();
+void turnOnCounter();
+int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd);
+void checkKeypress();
 
 #endif
