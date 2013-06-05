@@ -27,7 +27,7 @@
 
 #include "../util/type.h"
 #include "../util/util.h"
-#include "mot.h"
+#include "sam_motorboard.h"
 #include <TIME.H>
 #include <sys/time.h>
 
@@ -46,6 +46,8 @@
 
 // Drone lateral positioning calibration parameter
 #define POSITION_MARGIN_OF_ERROR 15
+#define ANTI_DURATION 0.3
+#define WAIT_DURATION 0.3
 
 ///////////////////////////////////////////////////
 // THREADING
@@ -61,6 +63,13 @@ pthread_t image_processing_thread;
 
 // END THREADING
 ///////////////////////////////////////////////////
+
+// Global time counting
+PositionTimePair prevTimePair;
+
+// Global control vars
+bool stopLoop = false;
+bool waitToStart = true;
 
 // Declare global variables for chopping image
 double percent = 0.20;
@@ -88,11 +97,14 @@ void turnLeft(float duration_in_seconds, float power){
     usleep(duration_in_seconds * 1000000);
 
     // Stop the motor
-    mot_run(0, 0, 0, 0);
+	mot_Run(power, 0, power, 0);
+	usleep(ANTI_DURATION * 1000000);
+    mot_Run(0, 0, 0, 0);
+	usleep(WAIT_DURATION * 1000000);
 }
 
 // Sam's version of pulse cw
-void turnRight(float duration, float power){
+void turnRight(float duration_in_seconds, float power){
     // Start the motor
     mot_Run(power, 0, power, 0);
 
@@ -100,11 +112,14 @@ void turnRight(float duration, float power){
     usleep(duration_in_seconds * 1000000);
 
     // Stop the motor
-    mot_run(0, 0, 0, 0);
+    mot_Run(0, power, 0, power);
+	usleep(ANTI_DURATION * 1000000);
+    mot_Run(0, 0, 0, 0);
+	usleep(WAIT_DURATION * 1000000);
 }
 
 // Drone flys up
-void flyUp(float duration, float power){
+void flyUp(float duration_in_seconds, float power){
     // Start the motor
     mot_Run(power, power, power, power);
 
@@ -112,44 +127,42 @@ void flyUp(float duration, float power){
     usleep(duration_in_seconds * 1000000);
 
     // Stop the motor
-    mot_run(0, 0, 0, 0);
-
+    mot_Run(0, 0, 0, 0);
+	usleep(WAIT_DURATION * 1000000);
 }
 
 void controller(){
-    float default_duration = 1.0;
+    float default_duration = 2;
     float default_flyup_duration = 5.0;
 
     // Fetch most recent position / timestamp
     PositionTimePair posTimePair = getPositionAndTimestamp();
 
     // If we already executed for this iteration, don't do anything
-    if(prevTimestamp == posTimePair.timestamp) return;
+    if (prevTimePair.timestamp == posTimePair.timestamp) return;
 
     // Populate current and past positions
     int curr_pos = posTimePair.position;
-    int prev_pos = prevTimeStamp.position;
 
     // Set previous timestamp
-    prevTimestamp = posTimePair.timestamp;
+    prevTimePair = posTimePair;
 
-    printf("Current Position: %i \n", curr_pos)
-    printf("Previous Position: %i\n", prev_pos);
+    printf("Current Position: %i \n", curr_pos);
 
     // If we detect no red, turn a small amount.
     if(curr_pos == 9999){
         // Turn right for default duration at 0.01 power.
-        turnRight(default_duration, 0.01);
+        turnRight(default_duration, 0.1);
         return;
     }
 
     // If we're here, red was detected. Find out if we turn right or left.
     if (curr_pos < -POSITION_MARGIN_OF_ERROR){
         // Turn right for default duration at 0.01 power.
-        turnRight(default_duration, 0.01);
+        turnRight(default_duration, 0.1);
     } else if (curr_pos > POSITION_MARGIN_OF_ERROR){
         // Turn left for default duration at 0.01 power.
-        turnLeft(default_duration, 0.01);
+        turnLeft(default_duration, 0.1);
     } else{
         // Fly up for default duration at 0.1 power.
         flyUp(default_flyup_duration, 0.1);
@@ -413,9 +426,7 @@ int main()
     // Kick off value getting thing in a separate thread!
     pthread_create(&image_processing_thread, NULL, process_images, NULL);
 
-    // Populate "previous" timestamp
-    PositionTimePair posTimePair = getPositionAndTimestamp();
-    prevTimestamp = posTimePair.timestamp;
+	prevTimePair = getPositionAndTimestamp();
 
     // Controller Loop
     while(1) {
