@@ -65,6 +65,7 @@ int minAAccel = pulseAAccel/3;
 int minLAccel = k*minAAccel;
 bool correctError = true;
 bool stopLoop = false;
+bool waitToStart = true;
 
 float throttle1 = 0.06;
 float throttle2 = 0;
@@ -197,19 +198,27 @@ void smallPulseCCW(float t){
     //mot_Run(0,.01,0,.01);
 }
 
-
+int counter =0;
 void looper(){
     // First thing: check for user input
     checkKeypress();
     printf("\n");
 
     // Control algorithm stuff
-    float dt=.4;
+	  // compute and print the elapsed time in millisec
+	gettimeofday(&t2, NULL);
+    float dt = (t2.tv_sec - t1.tv_sec) ;      // sec 
+    dt += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
+	t1 = t2;
+
     int angle = getAngle();
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
-    if(angle == 9999) return;
-
+    if(angle == 9999){
+		counter = (counter+1)%3;
+		if(counter == 0)smallPulse(1,1.5); 
+		return;
+	}
     // Velocity Calculation
     //( (float)(time - prevTime)/CLOCKS_PER_SEC );
     float vel = prevAngle == 9999 ? 0 : (float)(angle - prevAngle)/(dt);
@@ -219,7 +228,7 @@ void looper(){
     float error = vel - ( - 2 * float(angle)/50 );
     integral = integral*.5 + error*dt;
     float derivative = (error - previous_error)/dt;
-    float output =  -1.5*error; // - 1*integral //- 1*derivative/dt;
+    float output =  -2*error; // - 1*integral //- 1*derivative/dt;
     printf("Error: %f       Output: %f\n",error,output);
 
     // Print what pulse was given as a response
@@ -306,8 +315,9 @@ void checkKeypress(){
         mot_SetLeds(MOT_LEDOFF,MOT_LEDOFF,MOT_LEDOFF,MOT_LEDOFF);
     }
     if(c=='s') {
-        printf("\rLeds green            ");
-        mot_SetLeds(MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN);
+		waitToStart = false;
+        //printf("\rLeds green            ");
+        //mot_SetLeds(MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN);
     }
     if(c=='d') {
         printf("\rLeds orange            ");
@@ -526,6 +536,7 @@ int main()
 	dir= 1;
     while(1) {
 		checkKeypress(); 
+		if(waitToStart) continue;
 		if(stopLoop) break;
         looper();
 /*		smallPulse(dir,.9);
