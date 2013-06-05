@@ -109,7 +109,7 @@ class PositionServer():
                 # Some cameras flip the image. Unflip the value for more
                 # conventiona signage.
                 if self.flip:
-                    ang_dspl *= -1
+                    position *= -1
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
