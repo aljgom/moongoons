@@ -220,6 +220,7 @@ void smallPulseCCW(float t){
 	else mot_Run(.01,0,0,0);
 	cCWSwitcher = !cCWSwitcher;
 	if( t < max_duration)   usleep(t*1000000);
+
     else                usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(0,.01,0,.01);
@@ -228,14 +229,14 @@ void smallPulseCCW(float t){
 
 void pid_controller(){
     // First thing: check for user input
-    
+
 
     // Control algorithm stuff
-	  // compute and print the elapsed time in millisec
-	gettimeofday(&t2, NULL);
-    float dt = (t2.tv_sec - t1.tv_sec) ;      // sec 
+    // compute and print the elapsed time in millisec
+    gettimeofday(&t2, NULL);
+    float dt = (t2.tv_sec - t1.tv_sec) ;      // sec
     dt += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
-	t1 = t2;
+    t1 = t2;
 
 	PositionTimePair posTimePair = getPositionAndTimestamp();
 	if(prevTimestamp == posTimePair.timestamp) return;
@@ -246,10 +247,10 @@ void pid_controller(){
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
     if(angle == 9999){
-		counter = (counter+1)%3;
-		if(counter == 0)smallPulse(1,1.5); 
-		return;
-	}
+        counter = (counter+1)%3;
+        if(counter == 0)smallPulse(1,1.5);
+        return;
+    }
     // Velocity Calculation
     //( (float)(time - prevTime)/CLOCKS_PER_SEC );
     float vel = prevAngle == 9999 ? 0 : (float)(angle - prevAngle)/(dt);
@@ -344,6 +345,11 @@ void checkKeypress(){
     if(c=='a') {
         printf("\rLeds off            ");
         mot_SetLeds(MOT_LEDOFF,MOT_LEDOFF,MOT_LEDOFF,MOT_LEDOFF);
+    }
+    if(c=='s') {
+        waitToStart = false;
+        //printf("\rLeds green            ");
+        //mot_SetLeds(MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN);
     }
     if(c=='d') {
         printf("\rLeds orange            ");
