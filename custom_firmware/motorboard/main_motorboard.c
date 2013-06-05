@@ -42,8 +42,7 @@
 #define PORT_NUM 7777
 
 // THREADING
-pthread_mutex_t video_results_mutex;
-pthread_mutex_init(&video_results_mutex, NULL);
+pthread_mutex_t video_results_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // SHARED THREAD VARS
 int position_value = 9999;
@@ -409,8 +408,8 @@ void * process_images(void * param)
     // Now constantly fetch this and update the global variables
     while(1) {
         // Get picture into image buffer from video thread
-        video_GrabImage(vid, img);
-        buf1 = img_new->buf;
+        video_GrabImage(&vid, img);
+        buf1 = img->buf;
 
         // Set image buffer
         unsigned char image[chopped_size];
@@ -461,7 +460,7 @@ void * process_images(void * param)
         }
 
         // Message received is integer string if not equal
-        if (equal==0) {
+        if (equality==0) {
             // Lock the position value and update it
             pthread_mutex_lock(&video_results_mutex);
             position_value = atoi(buffer);
@@ -514,9 +513,9 @@ int main()
     // Cleanup
     // Delete the mutex
     pthread_mutex_destroy(&video_results_mutex);
-    close(sockfd);
-    close(newsockfd); // Close TCP socket
-    video_Close(&vid); // Close video thread
+    //close(sockfd);
+    //close(newsockfd); // Close TCP socket
+    //video_Close(&vid); // Close video thread
     mot_Close(); // Close motor thread
     printf("\nDone!\n");
 
