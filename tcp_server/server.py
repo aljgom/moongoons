@@ -84,6 +84,7 @@ class PositionServer():
             # FFMPEG in silent mode to convert the image
             ffmpeg_command = ['ffmpeg', '-s', str(self.width) + "x" + str(self.height), '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
 
+
             subprocess.call(ffmpeg_command, stdout=open(os.devnull, 'wb'))
 
             # Now let opencv decompress your image

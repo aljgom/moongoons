@@ -183,10 +183,10 @@ void smallPulseCCW(float t){
 }
 
 void looper(vid_struct * vid, img_struct * img_new, int newsockfd){
-	checkKeypress();
+    checkKeypress();
 /*clock_t time = clock();
-	int angle = getAngle(vid, img_new,newsockfd);
-	float dir = angle != 0 ? angle/abs(angle) : 0;
+    int angle = getAngle(vid, img_new,newsockfd);
+    float dir = angle != 0 ? angle/abs(angle) : 0;
 */
 	//printf("dir:%f",dir);
 	//pid would go here
@@ -213,6 +213,8 @@ void looper(vid_struct * vid, img_struct * img_new, int newsockfd){
   prevAngle = angle;
 
 	/*
+
+    /*
 
     float elapsedTime;
 
@@ -349,6 +351,7 @@ int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd)
     printf("getAngle\n");
     int n;
     int sum;
+
     // Get picture into image buffer from video thread
     video_GrabImage(vid, img_new);
     unsigned char * buf1 = img_new->buf;
