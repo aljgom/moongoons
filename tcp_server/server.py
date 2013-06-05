@@ -13,7 +13,7 @@ from colortracker import ColorTracker
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
@@ -26,6 +26,9 @@ class PositionServer():
 
         # Instantiate color tracker
         self.colortracker = ColorTracker()
+
+        # Flipping the value signs
+        self.flip = flip
 
         # Display initialization
         self.display = display
@@ -103,6 +106,11 @@ class PositionServer():
 
                 # Assume the "value" is an angular displacement
                 ang_dspl = str(int(position))
+
+                # Some cameras flip the image. Unflip the value for more
+                # conventiona signage.
+		if self.flip:
+		    ang_dspl *= -1
 
                 # Send angular displacement back to the AR Drone
                 if (len(ang_dspl) != 4):
