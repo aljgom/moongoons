@@ -25,6 +25,13 @@
 #include "motorboard.h"
 #include "../video/video.h"
 
+// Structure for retrieving both shared numbers at once as a pair
+typedef struct
+{
+    int position;
+    time_t timestamp;
+} PositionTimePair;
+
 int mot_Init();
 void mot_SetLed(u08 mot_id, u08 led);
 void mot_SetLeds(u08 led0, u08 led1, u08 led2, u08 led3);
@@ -46,5 +53,6 @@ void turnOnCW();
 void turnOnCCW();
 int getAngle();
 void checkKeypress();
+PositionTimePair getPositionAndTimestamp();
 
 #endif
