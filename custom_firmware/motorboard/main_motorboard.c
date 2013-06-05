@@ -364,8 +364,6 @@ int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd)
     memcpy(image+(y_lower-y_upper+1),buf1+cr_upper,cr_lower-cr_upper+1); // Copy Cr values
     memcpy(image+(y_lower-y_upper+1)+(cr_lower-cr_upper+1),buf1+cb_upper,cb_lower-cb_upper+1); // Copy Cb values
 
-    // Loop to send entire buffer to server
-    char buffer[4];
 
     // Send packet to client
     n = 0;
@@ -379,6 +377,9 @@ int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd)
         sum += n;
     }
 
+    // Loop to send entire buffer to server
+    char buffer[4];
+    
     // Read 4 character message from client
     bzero(buffer,4);
     n = 0;
@@ -391,6 +392,8 @@ int getAngle(vid_struct * vid, img_struct * img_new, int newsockfd)
         }
         sum += n;
     }
+
+    printf ("buffer is %s\n",buffer);
 
     /*
     Convert buffer to integer or NULL
