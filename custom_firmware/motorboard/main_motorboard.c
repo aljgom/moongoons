@@ -52,12 +52,7 @@ time_t img_recv_timestamp;
 // Global pthread for fetching image detection values
 pthread_t image_processing_thread;
 
-// Structure for retrieving both shared numbers at once as a pair
-typedef struct
-{
-    int position;
-    time_t timestamp;
-} PositionTimePair;
+
 
 /*****************************************************************/
 /*****************************************************************/
@@ -84,6 +79,7 @@ float step=0.01;
 float speedSmallPulse = 15;
 int prevAngle;
 clock_t prevTime;
+time_t prevTimestamp = 0;
 
 
 timeval t1, t2;
@@ -183,27 +179,37 @@ void turnOnCCW(){
 }
 
 void smallPulse(float dir,float duration){
-    printf("dir %f,  duration %f\n",dir);
+    printf("dir %f,  duration %f\n",dir,duration);
     if(dir>0)   smallPulseCCW(duration);
     else        smallPulseCW(duration);
 }
 
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
-    float duration = .9; //1.1
+    float min_duration = 1;
+	float max_duration = 1.5;
+
+	// Lower bound the pulse time
+	if (t < 0.8)	t = min_duration;
+
     mot_Run(.01,0,.01,0);
-    if( t < duration)   usleep(t*1000000);
-    else            usleep(duration*1000000);
+    if( t < max_duration)   usleep(t*1000000);
+    else            usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(.01,0,.01,0);
 }
 
 // Small counterclockwise motor pulse
 void smallPulseCCW(float t){
-    float duration = .9; //1.1
-    mot_Run(0,t,0,t);
-    if( t < duration)   usleep(t*1000000);
-    else                usleep(duration*1000000);
+	float min_duration = 1;
+    float max_duration = 1.5;
+
+	// Lower bound the pulse time
+	if (t < 0.8)	t = min_duration;
+	
+	mot_Run(0,.01,0,.01);
+    if( t < max_duration)   usleep(t*1000000);
+    else                usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(0,.01,0,.01);
 }
@@ -211,8 +217,7 @@ void smallPulseCCW(float t){
 
 void pid_controller(){
     // First thing: check for user input
-    checkKeypress();
-    printf("\n");
+    
 
     // Control algorithm stuff
 	  // compute and print the elapsed time in millisec
@@ -221,7 +226,12 @@ void pid_controller(){
     dt += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
 	t1 = t2;
 
-    int angle = getAngle();
+	PositionTimePair posTimePair = getPositionAndTimestamp();
+	if(prevTimestamp == posTimePair.timestamp) return;
+	printf("\n");
+	prevTimestamp = posTimePair.timestamp;
+    int angle = posTimePair.position;
+
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
     if(angle == 9999){
@@ -244,7 +254,7 @@ void pid_controller(){
     // Print what pulse was given as a response
     previous_error = error;
     float dir = output == 0 ? 0 : output/abs(output);
-    float pulseStrength=output > 0? output : -output; // abs() not working?
+    float pulseStrength = output > 0? output : -output; // abs() not working?
     pulseStrength = pulseStrength/9*.9;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
     smallPulse(dir,pulseStrength);
@@ -324,11 +334,6 @@ void checkKeypress(){
         printf("\rLeds off            ");
         mot_SetLeds(MOT_LEDOFF,MOT_LEDOFF,MOT_LEDOFF,MOT_LEDOFF);
     }
-    if(c=='s') {
-		waitToStart = false;
-        //printf("\rLeds green            ");
-        //mot_SetLeds(MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN);
-    }
     if(c=='d') {
         printf("\rLeds orange            ");
         mot_SetLeds(MOT_LEDORANGE,MOT_LEDORANGE,MOT_LEDORANGE,MOT_LEDORANGE);
@@ -336,6 +341,14 @@ void checkKeypress(){
     if(c=='f') {
         printf("\rLeds red            ");
         mot_SetLeds(MOT_LEDRED,MOT_LEDRED,MOT_LEDRED,MOT_LEDRED);
+    }
+    if(c=='s') {
+		waitToStart = false;
+        //printf("\rLeds green            ");
+        //mot_SetLeds(MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN,MOT_LEDGREEN);
+    }
+    if(c=='p') {
+		waitToStart = true;
     }
 
 }
@@ -488,7 +501,6 @@ void * process_images(void * param)
             if (n < 0) {
                 error("ERROR reading image data from socket!");
             }
-            printf("resend %d bytes\n",n);
             sum += n;
         }
 
@@ -584,6 +596,7 @@ int main()
     dir= 1;
     while(1) {
         checkKeypress();
+		if(waitToStart) continue;
         if(stopLoop) break;
         pid_controller();
 /*      smallPulse(dir,.9);
