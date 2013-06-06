@@ -115,7 +115,7 @@ class PositionServer():
             subprocess.call(ffmpeg_command, stdout=open(os.devnull, 'wb'))
 
             # Now let opencv decompress your image
-            cvimage = cv.LoadImage("tmp.jpg")
+            cvimage = cv.LoadImage(jpg_filename)
 
             if self.display:
                 # Put on computer display
