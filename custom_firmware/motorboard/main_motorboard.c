@@ -258,13 +258,16 @@ void pid_controller(){
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
     if(angle == 9999){
-        counter = (counter+1) % 5;
-        if(counter == 4) smallPulse(1,1.5);
+        counter = (counter+1);
+        if(counter%5 == 4) smallPulse(1,1.5);
         return;
     }
     else{
         if(counter){
-            smallPulse(0, 1.5);
+	    int x;
+            for(x = 0; x < counter/2; x++){
+                smallPulse(0, 1.5);
+            }
             counter = 0;
         }
 	}
