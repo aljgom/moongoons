@@ -2,6 +2,7 @@
 
 import cv
 import cProfile
+import errno
 import os
 import socket
 import subprocess
@@ -9,12 +10,20 @@ import sys
 import time
 
 from colortracker import ColorTracker
+from datetime import datetime
 
+# Util for file paths
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True, store_images=True):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
@@ -31,11 +40,20 @@ class PositionServer():
         # Flipping the value signs
         self.flip = flip
 
+        # Store intermediate images used to get position
+        self.store_images = store_images
+
         # Display initialization
         self.display = display
 
         # Colortracker threshold
         self.threshold = threshold
+
+        # For this specific run, the path to store images in
+        self.run_img_path = 'images/' + str(datetime.now()) + '/'
+
+        # Create relevant directories
+        make_sure_path_exists(self.run_img_path)
 
         # Camera display
         if self.display:
@@ -77,13 +95,22 @@ class PositionServer():
                 total_bytes += bytes_recvd
 
             # Write image to file
-            image_file = open('tmp.yuv', 'wb+')
+            image_name = str(datetime.now())
+            yuv_filename = self.run_img_path + image_name + '.yuv'
+            jpg_filename = self.run_img_path + image_name + '.jpg'
+
+            # If we don't want to store the images, just write into tmp.yuv
+            # or tmp.jpg and overwrite each time
+            if not self.store_images:
+                yuv_filename = 'images/tmp.yuv'
+                jpg_filename = 'images/tmp.jpg'
+
+            image_file = open(yuv_filename, 'wb+')
             image_file.write(self.image)
             image_file.close()
 
             # FFMPEG in silent mode to convert the image
-            ffmpeg_command = ['ffmpeg', '-s', str(self.width) + "x" + str(self.height), '-i', 'tmp.yuv', 'tmp.jpg', '-loglevel', 'panic']
-
+            ffmpeg_command = ['ffmpeg', '-s', str(self.width) + "x" + str(self.height), '-i', yuv_filename, jpg_filename, '-loglevel', 'panic']
 
             subprocess.call(ffmpeg_command, stdout=open(os.devnull, 'wb'))
 
