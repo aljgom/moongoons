@@ -111,6 +111,7 @@ void error(const char *msg)
     exit(0);
 }
 
+
 // Motor Control Functions
 void pulse(float dir,float t){
     if(dir>0)   pulseCCW(t);
@@ -198,7 +199,7 @@ void smallPulseCW(float t){  //starts with a pulse, then lowers speed
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 
-    if(UseOnlySingleMotors){
+    if(UseOnlySingleMotor){
         if(cWSwitcher) mot_Run(0,0,.01,0);
 	else mot_Run(.01,0,0,0);
 	cWSwitcher = !cWSwitcher;
@@ -257,7 +258,7 @@ void pid_controller(){
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
     if(angle == 9999){
-        counter = (counter+1)%5;
+        counter = (counter+1) % 5;
         if(counter == 4) smallPulse(1,1.5);
         return;
     }
@@ -266,12 +267,19 @@ void pid_controller(){
             smallPulse(0, 1.5);
             counter = 0;
         }
-    }
+	}
+
+
     // Velocity Calculation
     //( (float)(time - prevTime)/CLOCKS_PER_SEC );
     float vel = prevAngle == 9999 ? 0 : (float)(angle - prevAngle)/(dt);
     printf("Vel: %f\n",vel);
 
+	if( abs(angle) < 10 && fabsf(vel) <10 ) 	{
+		mot_Run(.01,.01,.01,.01);
+		usleep(1*1000000);
+		mot_Run(0,0,0,0);
+	}
     // Error Calculation
     float error = vel - ( - 2 * float(angle)/50 );
     integral = integral*.5 + error*dt;
@@ -281,14 +289,14 @@ void pid_controller(){
 
     // Print what pulse was given as a response
     previous_error = error;
-    float dir = output == 0 ? 0 : output/abs(output);
-    float pulseStrength = output > 0? output : -output; // abs() not working?
+    float dir = output == 0 ? 0 : output/fabsf(output);
+    float pulseStrength = fabsf(output);
     pulseStrength = pulseStrength/70 * .7 +.8;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
     smallPulse(dir,pulseStrength);
     //usleep(.1 * 1000000);
 
-    prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
+    prevDuration = fabsf(output)>90 ? .9 : fabsf(output)/90*.9;
     prevAngle = angle;
 }
 
