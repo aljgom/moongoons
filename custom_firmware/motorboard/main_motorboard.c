@@ -262,8 +262,10 @@ void pid_controller(){
         return;
     }
     else{
-        smallPulse(0, 1.5);
-        counter = 0;
+        if(counter){
+            smallPulse(0, 1.5);
+            counter = 0;
+        }
     }
     // Velocity Calculation
     //( (float)(time - prevTime)/CLOCKS_PER_SEC );
