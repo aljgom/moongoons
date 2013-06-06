@@ -265,7 +265,7 @@ void pid_controller(){
     else{
         if(counter){
 	    int x;
-            for(x = 0; x < counter/2; x++){
+            for(x = 0; x < counter/10; x++){
                 smallPulse(0, 1.5);
             }
             counter = 0;
@@ -279,6 +279,7 @@ void pid_controller(){
     printf("Vel: %f\n",vel);
 
 	if( abs(angle) < 10 && fabsf(vel) <10 ) 	{
+		usleep(.1*1000000);		//not sure if this line necessary? (to prevent pulses from merging)
 		mot_Run(.01,.01,.01,.01);
 		usleep(1*1000000);
 		mot_Run(0,0,0,0);
@@ -294,10 +295,11 @@ void pid_controller(){
     // Print what pulse was given as a response
     previous_error = error;
     float dir = output == 0 ? 0 : output/fabsf(output);
-    float pulseStrength = fabsf(output);
-    pulseStrength = pulseStrength/70 * .7 +.8;
+    float pulseStrength = fabsf(output)/70 * .7 +.8;		// try to keep the range between .8 and 1.5
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
-    smallPulse(dir,pulseStrength);
+    if(output < 150){										// sometimes output is huge randomly? TODO: find out why
+		smallPulse(dir,pulseStrength);
+	}
     //usleep(.1 * 1000000);
 
     prevDuration = fabsf(output)>90 ? .9 : fabsf(output)/90*.9;
