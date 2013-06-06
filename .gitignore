@@ -1,2 +1,5 @@
 *.pyc
 *.yuv
+tmp.yuv
+tmp.jpg
+images/
