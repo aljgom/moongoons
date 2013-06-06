@@ -75,7 +75,7 @@ float throttle1 = 0.06;
 float throttle2 = 0;
 float throttle3 = 0.06;
 float throttle4 = 0;
-float step=0.01;
+float step=0.3;
 float speedSmallPulse = 15;
 int prevAngle;
 clock_t prevTime;
@@ -158,9 +158,9 @@ float smallWait(float angle){
 bool cWSwitcher = true;
 bool cCWSwitcher = false;
 void pulseCW(float t){
-    //mot_Run(.01,0,.01,0);
-	if(cWSwitcher) mot_Run(0,0,.01,0);
-	else mot_Run(.01,0,0,0);
+    //mot_Run(.3,0,.3,0);
+	if(cWSwitcher) mot_Run(0,0,.3,0);
+	else mot_Run(.3,0,0,0);
 	cWSwitcher = !cWSwitcher;
     usleep(t*1000000);
     mot_Run(0,0,0,0);	
@@ -168,7 +168,7 @@ void pulseCW(float t){
 
 // Pulse motors such that drone moves counterclockwise
 void pulseCCW(float t){
-	mot_Run(0,.01,0,.01);
+	mot_Run(0,.3,0,.3);
 	usleep(t*1000000);
     mot_Run(0,0,0,0);
 }
@@ -177,12 +177,12 @@ void pulseCCW(float t){
 
 // Clockwise
 void turnOnCW(){
-    mot_Run(.01,0,.01,0);
+    mot_Run(.3,0,.3,0);
 }
 
 // Counterclockwise
 void turnOnCCW(){
-    mot_Run(0,.01,0,.01);
+    mot_Run(0,.3,0,.3);
 }
 
 void smallPulse(float dir,float duration){
@@ -193,25 +193,25 @@ void smallPulse(float dir,float duration){
 
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
-    float min_duration = 1;
-	float max_duration = 1.5;
-
+    float min_duration = 1*2;
+	float max_duration = 1.5*2;
+	t*=2;
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 
-    if(UseOnlySingleMotor){
-        if(cWSwitcher) mot_Run(0,0,.01,0);
-	else mot_Run(.01,0,0,0);
+    if(UseOnlySingleMotor){ //changed
+        if(cWSwitcher) mot_Run(.3,0,.3,0);
+	else mot_Run(.3,0,.3,0);
 	cWSwitcher = !cWSwitcher;
     }
     else{
-        mot_Run(.01,0,.01,0);
+        mot_Run(.3,0,.3,0);
     }
 
     if( t < max_duration)   usleep(t*1000000);
     else            usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
-    //mot_Run(.01,0,.01,0);
+    //mot_Run(.3,0,.3,0);
 }
 
 // Small counterclockwise motor pulse
@@ -223,18 +223,18 @@ void smallPulseCCW(float t){
 	if (t < 0.8)	t = min_duration;
 	
     if(UseOnlySingleMotor){
-        if(cCWSwitcher) mot_Run(0,0,0,0.01);
-	else mot_Run(0,0.01,0,0);
+        if(cCWSwitcher) mot_Run(0,0,0,0.3);
+	else mot_Run(0,0.3,0,0);
 	cCWSwitcher = !cCWSwitcher;
     }
     else{ 
-	mot_Run(0,.01,0,.01);
+	mot_Run(0,.3,0,.3);
     }
 
     if( t < max_duration)   usleep(t*1000000);
     else                usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
-    //mot_Run(0,.01,0,.01);
+    //mot_Run(0,.3,0,.3);
 }
 
 
@@ -281,8 +281,8 @@ void pid_controller(){
 
 	if( abs(angle) < 10 && fabsf(vel) <10 ) 	{
 		usleep(.1*1000000);		//not sure if this line necessary? (to prevent pulses from merging)
-		mot_Run(.01,.01,.01,.01);
-		usleep(1*1000000);
+		mot_Run(.3,.3,.3,.3);
+		usleep(2*1000000);
 		mot_Run(0,0,0,0);
 		usleep(.1*1000000);
 	}
@@ -329,10 +329,10 @@ void checkKeypress(){
     }
     if(c=='5') {
         printf("\rRun All Motors 50%            ");
-        throttle1 = .01;
-        throttle2 = .01;
-        throttle3 = .01;
-        throttle4 = .01;
+        throttle1 = .3;
+        throttle2 = .3;
+        throttle3 = .3;
+        throttle4 = .3;
         mot_Run(throttle1,throttle2,throttle3,throttle4);
     }
     if(c==',') {
@@ -640,11 +640,21 @@ int main()
     gettimeofday(&t1, NULL);
 
     // PID Loop
-    float s = .01;
+    float s = .3;
     dir= 1;
+	mot_Run(.1,.1,.1,.1);
+	bool runningMotors = true;
     while(1) {
         checkKeypress();
-		if(waitToStart) continue;
+		if(waitToStart){
+			mot_Run(0,0,0,0);
+			runningMotors = false;
+			continue;
+		}
+		if(!runningMotors){
+			mot_Run(.1,.1,.1,.1);
+			runningMotors = true;
+		}
         if(stopLoop) break;
         pid_controller();
 /*      smallPulse(dir,.9);
@@ -653,13 +663,13 @@ int main()
         usleep(1.5 * 1000000);
         printf("%f\n",s);
         if(dir > 0) dir = -1; else dir = 1;
-        s+=.01;
+        s+=.3;
         smallPulse(dir,.9);
         usleep(s * 1000000);
         smallPulse(dir,.9);
         usleep(1.5 * 1000000);
         printf("%f\n",s);
-        s+=.01;
+        s+=.3;
 */
         //yield to other threads
         pthread_yield();
