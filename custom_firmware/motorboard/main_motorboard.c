@@ -87,6 +87,7 @@ int previous_error = 0;
 float integral = 0 ;
 float prevDuration = 0;
 int counter = 0;
+bool UseOnlySingleMotor = true;
 
 int angleGlobal;
 /*****************************************************************/
@@ -197,11 +198,16 @@ void smallPulseCW(float t){  //starts with a pulse, then lowers speed
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 
-    //mot_Run(.01,0,.01,0);
-    if(cWSwitcher) mot_Run(0,0,.01,0);
+    if(UseOnlySingleMotors){
+        if(cWSwitcher) mot_Run(0,0,.01,0);
 	else mot_Run(.01,0,0,0);
 	cWSwitcher = !cWSwitcher;
-	if( t < max_duration)   usleep(t*1000000);
+    }
+    else{
+        mot_Run(.01,0,.01,0);
+    }
+
+    if( t < max_duration)   usleep(t*1000000);
     else            usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(.01,0,.01,0);
@@ -215,12 +221,16 @@ void smallPulseCCW(float t){
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 	
-	//mot_Run(0,.01,0,.01);
-    if(cCWSwitcher) mot_Run(0,0,0,0.01);
+    if(UseOnlySingleMotor){
+        if(cCWSwitcher) mot_Run(0,0,0,0.01);
 	else mot_Run(0,0.01,0,0);
 	cCWSwitcher = !cCWSwitcher;
-	if( t < max_duration)   usleep(t*1000000);
+    }
+    else{ 
+	mot_Run(0,.01,0,.01);
+    }
 
+    if( t < max_duration)   usleep(t*1000000);
     else                usleep(max_duration*1000000);
     mot_Run(0,0,0,0);
     //mot_Run(0,.01,0,.01);
@@ -250,6 +260,10 @@ void pid_controller(){
         counter = (counter+1)%5;
         if(counter == 4) smallPulse(1,1.5);
         return;
+    }
+    else{
+        smallPulse(0, 1.5);
+        counter = 0;
     }
     // Velocity Calculation
     //( (float)(time - prevTime)/CLOCKS_PER_SEC );
