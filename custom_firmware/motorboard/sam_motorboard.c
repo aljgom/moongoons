@@ -46,8 +46,22 @@
 
 // Drone lateral positioning calibration parameter
 #define POSITION_MARGIN_OF_ERROR 15
-#define ANTI_DURATION 0.3
-#define WAIT_DURATION 0.3
+#define ANTI_DURATION 1
+#define WAIT_DURATION 1
+#define DEFAULT_POWER 0.01
+
+// NOTE: 0.5-0.9 for ascending in zero g.
+#define FLYUP_POWER 0.6
+#define TURN_DURATION = 2.3;
+#define STOP_DURATION = 1;
+#define DEFAULT_FLYUP_DURATION = 5.0;
+#define ADDITIONAL_POWER = 0.05;
+
+// Global motor speeds
+float motor1 = DEFAULT_POWER;
+float motor2 = DEFAULT_POWER;
+float motor3 = DEFAULT_POWER;
+float motor4 = DEFAULT_POWER;
 
 ///////////////////////////////////////////////////
 // THREADING
@@ -88,53 +102,40 @@ void error(const char *msg)
     exit(0);
 }
 
-// Sam's version of pulse ccw
-void turnLeft(float duration_in_seconds, float power){
-    // Start the motor
-    mot_Run(0, power, 0, power);
+void turnLeft(float seconds_to_sleep, float additional_power){
+    // Add power to two motors
+    motor2 = motor2 + additional_power;
+    motor4 = motor4 + additional_power;
+    mot_Run(motor1, motor2, motor3, motor4);
 
     // Sleep - usleep uses microseconds
-    usleep(duration_in_seconds * 1000000);
-
-    // Stop the motor
-	mot_Run(power, 0, power, 0);
-	usleep(ANTI_DURATION * 1000000);
-    mot_Run(0, 0, 0, 0);
-	usleep(WAIT_DURATION * 1000000);
+    usleep(seconds_to_sleep * 1000000);
 }
 
-// Sam's version of pulse cw
-void turnRight(float duration_in_seconds, float power){
-    // Start the motor
-    mot_Run(power, 0, power, 0);
+void turnRight(float seconds_to_sleep, float additional_power){
+    // Add power to two motors
+    motor1 = motor1 + additional_power;
+    motor3 = motor3 + additional_power;
+    mot_Run(motor1, motor2, motor3, motor4);
 
     // Sleep - usleep uses microseconds
-    usleep(duration_in_seconds * 1000000);
-
-    // Stop the motor
-    mot_Run(0, power, 0, power);
-	usleep(ANTI_DURATION * 1000000);
-    mot_Run(0, 0, 0, 0);
-	usleep(WAIT_DURATION * 1000000);
+    usleep(seconds_to_sleep * 1000000);
 }
 
-// Drone flys up
-void flyUp(float duration_in_seconds, float power){
+void setAllMotors(float seconds_to_sleep, float power){
     // Start the motor
-    mot_Run(power, power, power, power);
+    motor1 = power;
+    motor2 = power;
+    motor3 = power;
+    motor4 = power;
+
+    mot_Run(motor1, motor2, motor3, motor4);
 
     // Sleep - usleep uses microseconds
-    usleep(duration_in_seconds * 1000000);
-
-    // Stop the motor
-    mot_Run(0, 0, 0, 0);
-	usleep(WAIT_DURATION * 1000000);
+    usleep(seconds_to_sleep * 1000000);
 }
 
 void controller(){
-    float default_duration = 2;
-    float default_flyup_duration = 5.0;
-
     // Fetch most recent position / timestamp
     PositionTimePair posTimePair = getPositionAndTimestamp();
 
@@ -151,21 +152,28 @@ void controller(){
 
     // If we detect no red, turn a small amount.
     if(curr_pos == 9999){
-        // Turn right for default duration at 0.01 power.
-        turnRight(default_duration, 0.1);
+        // Turn right for default duration at 0.01 additional power.
+        turnRight(TURN_DURATION, 0.01);
+        turnLeft(STOP_DURATION, 0.01);
         return;
     }
 
     // If we're here, red was detected. Find out if we turn right or left.
     if (curr_pos < -POSITION_MARGIN_OF_ERROR){
-        // Turn right for default duration at 0.01 power.
-        turnRight(default_duration, 0.1);
+        // Turn right for duration w/ additional power.
+        turnRight(TURN_DURATION, ADDITIONAL_POWER);
+        turnLeft(STOP_DURATION, ADDITIONAL_POWER);
+
+        // Equalize and sleep for 2 seconds before proceeding
     } else if (curr_pos > POSITION_MARGIN_OF_ERROR){
-        // Turn left for default duration at 0.01 power.
-        turnLeft(default_duration, 0.1);
+        // Turn left for duration w/ additional power.
+        turnLeft(TURN_DURATION, ADDITIONAL_POWER);
+        turnRight(STOP_DURATION, ADDITIONAL_POWER);
+
+        setAllMotors(2, DEFAULT_POWER);
     } else{
-        // Fly up for default duration at 0.1 power.
-        flyUp(default_flyup_duration, 0.1);
+        // Fly up for default duration at 0.1 additional power.
+        setAllMotors(DEFAULT_FLYUP_DURATION, FLYUP_POWER);
     }
 
     // TODO: Make it so that we can detect oscillation between parameters.
@@ -178,6 +186,10 @@ void checkKeypress(){
     int c=tolower(util_getch());
 
     if(c=='q') stopLoop = true;
+    if(c=='1') {
+        turnRight(TURN_DURATION, 0.01);
+        turnLeft(STOP_DURATION, 0.01);
+    }
     if(c==' ') {
         printf("\rStop            ");
         mot_Stop();
@@ -426,7 +438,7 @@ int main()
     // Kick off value getting thing in a separate thread!
     pthread_create(&image_processing_thread, NULL, process_images, NULL);
 
-	prevTimePair = getPositionAndTimestamp();
+    prevTimePair = getPositionAndTimestamp();
 
     // Controller Loop
     while(1) {
