@@ -282,6 +282,7 @@ void pid_controller(){
 		mot_Run(.01,.01,.01,.01);
 		usleep(1*1000000);
 		mot_Run(0,0,0,0);
+		usleep(.1*1000000);
 	}
     // Error Calculation
     float error = vel - ( - 2 * float(angle)/50 );
