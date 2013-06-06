@@ -248,7 +248,7 @@ void pid_controller(){
 
     if(angle == 9999){
         counter = (counter+1)%5;
-        if(counter == 4)smallPulse(1,1.5);
+        if(counter == 4) smallPulse(1,1.5);
         return;
     }
     // Velocity Calculation
@@ -261,7 +261,7 @@ void pid_controller(){
     integral = integral*.5 + error*dt;
     float derivative = (error - previous_error)/dt;
     float output =  -2*error - 1*integral - 1*derivative/dt;
-    printf("Error: %f       Output: %f\n",error,output);
+    printf("Error: %f       Output: %f\n", error, output);
 
     // Print what pulse was given as a response
     previous_error = error;
