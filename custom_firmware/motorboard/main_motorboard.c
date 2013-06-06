@@ -198,7 +198,7 @@ void smallPulseCW(float t){  //starts with a pulse, then lowers speed
 	// Lower bound the pulse time
 	if (t < 0.8)	t = min_duration;
 
-    if(UseOnlySingleMotors){
+    if(UseOnlySingleMotor){
         if(cWSwitcher) mot_Run(0,0,.01,0);
 	else mot_Run(.01,0,0,0);
 	cWSwitcher = !cWSwitcher;
@@ -257,13 +257,16 @@ void pid_controller(){
     printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
 
     if(angle == 9999){
-        counter = (counter+1)%5;
-        if(counter == 4) smallPulse(1,1.5);
+        counter = (counter+1);
+        if(counter%5 == 4) smallPulse(1,1.5);
         return;
     }
     else{
         if(counter){
-            smallPulse(0, 1.5);
+	    int x;
+            for(x = 0; x < counter/2; x++){
+                smallPulse(0, 1.5);
+            }
             counter = 0;
         }
     }
