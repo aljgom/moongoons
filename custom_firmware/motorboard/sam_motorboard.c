@@ -242,6 +242,10 @@ void checkKeypress(){
         // Neutral
         setAllMotors(0, 0);
     }
+    if(c=='u') {
+        // fly up
+        setAllMotors(0, FLYUP_POWER);
+    }
     if(c==' ') {
         printf("\rStop            ");
         mot_Stop();
