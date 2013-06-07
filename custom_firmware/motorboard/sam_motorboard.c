@@ -45,7 +45,7 @@
 #define PORT_NUM 7777
 
 // Drone lateral positioning calibration parameter
-#define POSITION_MARGIN_OF_ERROR 15
+#define POSITION_MARGIN_OF_ERROR 5
 #define ANTI_DURATION 1
 #define WAIT_DURATION 1
 #define DEFAULT_POWER 0.01
@@ -55,20 +55,20 @@
 #define FLYUP_POWER 0.8
 
 // Direction dependent durations
-#define LEFT_TURN_DURATION 1.5
-#define LEFT_STOP_DURATION 1
-#define RIGHT_TURN_DURATION .5
-#define RIGHT_STOP_DURATION .5
+#define LEFT_TURN_DURATION 1.3
+#define LEFT_STOP_DURATION .15
+#define RIGHT_TURN_DURATION 1.3
+#define RIGHT_STOP_DURATION .15
 
 // Cancellation of acceleration when we turn in search of red
 #define ACCEL_CANCEL 0
 
 #define TURN_DURATION .5
 #define STOP_DURATION .5
-#define SPACER_DURATION 2
+#define SPACER_DURATION .5
 
 #define DEFAULT_FLYUP_DURATION 5.0
-#define ADDITIONAL_POWER 0.05
+#define ADDITIONAL_POWER 0.1
 
 // Parameters for completely neutral flight of this drone
 // Any drift should tend to go right (clockwise) 
@@ -190,7 +190,7 @@ void controller(){
         turnRight(LEFT_STOP_DURATION + ACCEL_CANCEL, ADDITIONAL_POWER);
 
         // Return the motors to neutral speed
-        setAllMotors(SPACER_DURATION, DEFAULT_POWER);
+        setAllMotors(SPACER_DURATION, 0);
         return;
     }
 
@@ -203,7 +203,7 @@ void controller(){
         turnLeft(RIGHT_STOP_DURATION, ADDITIONAL_POWER);
 
         // Go to neutral
-        setAllMotors(SPACER_DURATION, DEFAULT_POWER);
+        setAllMotors(SPACER_DURATION, 0);
     } else if (curr_pos > POSITION_MARGIN_OF_ERROR){
         // Turn left for duration w/ additional power.
         turnLeft(LEFT_TURN_DURATION, ADDITIONAL_POWER);
@@ -212,7 +212,7 @@ void controller(){
         turnRight(LEFT_STOP_DURATION, ADDITIONAL_POWER);
 
         // Go to neutral
-        setAllMotors(SPACER_DURATION, DEFAULT_POWER);
+        setAllMotors(SPACER_DURATION, 0);
     } else{
         // Fly up for default duration at 0.1 additional power.
         setAllMotors(DEFAULT_FLYUP_DURATION, FLYUP_POWER);
