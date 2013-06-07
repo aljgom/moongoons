@@ -54,5 +54,9 @@ void turnOnCCW();
 int getAngle();
 void checkKeypress();
 PositionTimePair getPositionAndTimestamp();
+void stopMotors();
+void turnCW(float speed);
+void turnCCW(float speed);
+void goStraight(float speed);
 
 #endif

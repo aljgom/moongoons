@@ -87,9 +87,11 @@ int previous_error = 0;
 float integral = 0 ;
 float prevDuration = 0;
 int counter = 0;
-bool UseOnlySingleMotor = true;
+bool UseOnlySingleMotor = false;
+float straightSpeed = .01;
 
 int angleGlobal;
+float smallPulseSpeed = .3;
 /*****************************************************************/
 /*****************************************************************/
 
@@ -119,8 +121,8 @@ void pulse(float dir,float t){
 }
 
 void turnOn(float dir){
-    if(dir>0)   turnOnCCW();
-    else        turnOnCW();
+    if(dir>0)   turnCCW(straightSpeed);
+    else        turnCW(straightSpeed);
 }
 
 // Returns a time in milliseconds representing how long to wait after the first pulse
@@ -158,34 +160,34 @@ float smallWait(float angle){
 bool cWSwitcher = true;
 bool cCWSwitcher = false;
 void pulseCW(float t){
-    //mot_Run(.3,0,.3,0);
-	if(cWSwitcher) mot_Run(0,0,.3,0);
-	else mot_Run(.3,0,0,0);
-	cWSwitcher = !cWSwitcher;
-    usleep(t*1000000);
-    mot_Run(0,0,0,0);	
+	turnCW(smallPulseSpeed);
+	usleep(t*1000000);
+    stopMotors();
 }
 
 // Pulse motors such that drone moves counterclockwise
 void pulseCCW(float t){
-	mot_Run(0,.3,0,.3);
+	turnCCW(smallPulseSpeed);
 	usleep(t*1000000);
-    mot_Run(0,0,0,0);
+    stopMotors();
 }
 
 // Turn on functions: start spinning the motors then reduce to low speed
 
-// Clockwise
-void turnOnCW(){
-    mot_Run(.3,0,.3,0);
-}
 
-// Counterclockwise
-void turnOnCCW(){
-    mot_Run(0,.3,0,.3);
-}
 
+void stopMotors(){
+	mot_Run(0,0,0,0);	
+}
+void turnCCW(float speed){
+	mot_Run(speed,straightSpeed,speed,straightSpeed);	
+}
+void turnCW(float speed){
+	mot_Run(straightSpeed,speed,straightSpeed,speed);	
+}
+float maxDuration = 1.5;
 void smallPulse(float dir,float duration){
+	if(duration > maxDuration) duration = maxDuration;
     printf("dir %f,  duration %f\n",dir,duration);
     if(dir>0)   smallPulseCCW(duration);
     else        smallPulseCW(duration);
@@ -193,49 +195,36 @@ void smallPulse(float dir,float duration){
 
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
-    float min_duration = 1*2;
-	float max_duration = 1.5*2;
-	t*=2;
-	// Lower bound the pulse time
-	if (t < 0.8)	t = min_duration;
-
     if(UseOnlySingleMotor){ //changed
-        if(cWSwitcher) mot_Run(.3,0,.3,0);
-	else mot_Run(.3,0,.3,0);
-	cWSwitcher = !cWSwitcher;
+        if(cWSwitcher)  mot_Run(straightSpeed,straightSpeed,straightSpeed,smallPulseSpeed);
+		else			mot_Run(straightSpeed,smallPulseSpeed,straightSpeed,straightSpeed);
+		cWSwitcher = !cWSwitcher;
     }
     else{
-        mot_Run(.3,0,.3,0);
+       turnCW(smallPulseSpeed);
     }
-
-    if( t < max_duration)   usleep(t*1000000);
-    else            usleep(max_duration*1000000);
-    mot_Run(0,0,0,0);
-    //mot_Run(.3,0,.3,0);
+    usleep(t*1000000);
+    goStraight(straightSpeed);
 }
 
 // Small counterclockwise motor pulse
 void smallPulseCCW(float t){
-	float min_duration = 1;
-    float max_duration = 1.5;
-
-	// Lower bound the pulse time
-	if (t < 0.8)	t = min_duration;
-	
     if(UseOnlySingleMotor){
-        if(cCWSwitcher) mot_Run(0,0,0,0.3);
-	else mot_Run(0,0.3,0,0);
-	cCWSwitcher = !cCWSwitcher;
+        if(cCWSwitcher) mot_Run(straightSpeed,straightSpeed,smallPulseSpeed,straightSpeed);
+		else			mot_Run(smallPulseSpeed,straightSpeed,straightSpeed,straightSpeed);
+		cCWSwitcher = !cCWSwitcher;
     }
     else{ 
-	mot_Run(0,.3,0,.3);
+		turnCCW(smallPulseSpeed);
     }
-
-    if( t < max_duration)   usleep(t*1000000);
-    else                usleep(max_duration*1000000);
-    mot_Run(0,0,0,0);
-    //mot_Run(0,.3,0,.3);
+    usleep(t*1000000);
+    goStraight(straightSpeed);
 }
+void goStraight(float speed){
+	// make it not spin	.1, 1.8 , 1 ,1.8
+	mot_Run(speed,speed,speed,speed);	
+}
+
 
 
 void pid_controller(){
@@ -260,14 +249,14 @@ void pid_controller(){
     if(angle == 9999){
         integral = 0;
         counter = (counter+1);
-        if(counter%5 == 4) smallPulse(1,1.5);
+        if(counter%5 == 4) smallPulse(1,.5);
         return;
     }
     else{
         if(counter){
 	    int x;
             for(x = 0; x < counter/10; x++){
-                smallPulse(0, 1.5);
+                smallPulse(-1, .5);
             }
             counter = 0;
         }
@@ -281,9 +270,7 @@ void pid_controller(){
 
 	if( abs(angle) < 10 && fabsf(vel) <10 ) 	{
 		usleep(.1*1000000);		//not sure if this line necessary? (to prevent pulses from merging)
-		mot_Run(.3,.3,.3,.3);
-		usleep(2*1000000);
-		mot_Run(0,0,0,0);
+		goStraight(straightSpeed);
 		usleep(.1*1000000);
 	}
     // Error Calculation
@@ -296,7 +283,7 @@ void pid_controller(){
     // Print what pulse was given as a response
     previous_error = error;
     float dir = output == 0 ? 0 : output/fabsf(output);
-    float pulseStrength = fabsf(output)/70 * .7 +.8;		// try to keep the range between .8 and 1.5
+    float pulseStrength = fabsf(output)/70 * .7 ;		// try to keep the range between .8 and 1.5
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
     if(output < 150){										// sometimes output is huge randomly? TODO: find out why
 		smallPulse(dir,pulseStrength);
@@ -642,7 +629,7 @@ int main()
     // PID Loop
     float s = .3;
     dir= 1;
-	mot_Run(.1,.1,.1,.1);
+	mot_Run(straightSpeed,straightSpeed,straightSpeed,straightSpeed);
 	bool runningMotors = true;
     while(1) {
         checkKeypress();
@@ -652,7 +639,7 @@ int main()
 			continue;
 		}
 		if(!runningMotors){
-			mot_Run(.1,.1,.1,.1);
+			mot_Run(straightSpeed,straightSpeed,straightSpeed,straightSpeed);
 			runningMotors = true;
 		}
         if(stopLoop) break;
