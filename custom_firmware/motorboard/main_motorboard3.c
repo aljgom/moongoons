@@ -37,7 +37,7 @@
 
 // For navdata
 #include "../navboard/navboard.c"
-#include "../navboard/navboard.h"
+
 // Constants
 #define VIDEO_WIDTH 640
 #define VIDEO_HEIGHT 480
@@ -78,7 +78,7 @@ float throttle1 = 0.06;
 float throttle2 = 0;
 float throttle3 = 0.06;
 float throttle4 = 0;
-float step=0.3;
+float step=0.01;
 float speedSmallPulse = 15;
 int prevAngle;
 clock_t prevTime;
@@ -90,11 +90,8 @@ int previous_error = 0;
 float integral = 0 ;
 float prevDuration = 0;
 int counter = 0;
-bool UseOnlySingleMotor = false;
-float straightSpeed = .01;
 
 int angleGlobal;
-float smallPulseSpeed = .3;
 /*****************************************************************/
 /*****************************************************************/
 
@@ -109,9 +106,8 @@ int cb_upper = VIDEO_WIDTH*VIDEO_HEIGHT/8*(11-percent);
 int cb_lower = VIDEO_WIDTH*VIDEO_HEIGHT/8*(11+percent)-1;
 int chopped_size = (y_lower-y_upper+1)+(cr_lower-cr_upper+1)+(cb_lower-cb_upper+1);
 
-// Declare global variables to ignore navdata check
+// Declare global variable to ignore navdata check
 int ignore_navdata = 0;
-int ignore_datawrite = 0;
 
 // Exit and print error message
 void error(const char *msg)
@@ -120,7 +116,6 @@ void error(const char *msg)
     exit(0);
 }
 
-
 // Motor Control Functions
 void pulse(float dir,float t){
     if(dir>0)   pulseCCW(t);
@@ -128,8 +123,8 @@ void pulse(float dir,float t){
 }
 
 void turnOn(float dir){
-    if(dir>0)   turnCCW(straightSpeed);
-    else        turnCW(straightSpeed);
+    if(dir>0)   turnOnCCW();
+    else        turnOnCW();
 }
 
 // Returns a time in milliseconds representing how long to wait after the first pulse
@@ -167,197 +162,144 @@ float smallWait(float angle){
 bool cWSwitcher = true;
 bool cCWSwitcher = false;
 void pulseCW(float t){
-	turnCW(smallPulseSpeed);
-	usleep(t*1000000);
-    stopMotors();
+    //mot_Run(.01,0,.01,0);
+	if(cWSwitcher) mot_Run(0,0,.01,0);
+	else mot_Run(.01,0,0,0);
+	cWSwitcher = !cWSwitcher;
+    usleep(t*1000000);
+    mot_Run(0,0,0,0);	
 }
 
 // Pulse motors such that drone moves counterclockwise
 void pulseCCW(float t){
-	turnCCW(smallPulseSpeed);
+	mot_Run(0,.01,0,.01);
 	usleep(t*1000000);
-    stopMotors();
+    mot_Run(0,0,0,0);
 }
 
 // Turn on functions: start spinning the motors then reduce to low speed
 
+// Clockwise
+void turnOnCW(){
+    mot_Run(.01,0,.01,0);
+}
 
+// Counterclockwise
+void turnOnCCW(){
+    mot_Run(0,.01,0,.01);
+}
 
-void stopMotors(){
-	mot_Run(0,0,0,0);	
-}
-void turnCCW(float speed){
-	mot_Run(speed,straightSpeed,speed,straightSpeed);	
-}
-void turnCW(float speed){
-	mot_Run(straightSpeed,speed,straightSpeed,speed);	
-}
-float maxDuration = .5;
 void smallPulse(float dir,float duration){
-	if(duration > maxDuration) duration = maxDuration;
     printf("dir %f,  duration %f\n",dir,duration);
-    if(dir>0)   smallPulseCW(duration);
-    else        smallPulseCCW(duration);
+    if(dir>0)   smallPulseCCW(duration);
+    else        smallPulseCW(duration);
 }
 
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
-	printf("Pulse Clockwise\n");
-    if(UseOnlySingleMotor){ //changed
-        if(cWSwitcher)  mot_Run(straightSpeed,straightSpeed,straightSpeed,smallPulseSpeed);
-		else			mot_Run(straightSpeed,smallPulseSpeed,straightSpeed,straightSpeed);
-		cWSwitcher = !cWSwitcher;
-    }
-    else{
-       turnCW(smallPulseSpeed);
-    }
-    usleep(t*1000000);
-    goStraight(straightSpeed);
+    float min_duration = 1;
+	float max_duration = 1.5;
+
+	// Lower bound the pulse time
+	if (t < 0.8)	t = min_duration;
+
+    //mot_Run(.01,0,.01,0);
+    if(cWSwitcher) mot_Run(0,0,.01,0);
+	else mot_Run(.01,0,0,0);
+	cWSwitcher = !cWSwitcher;
+	if( t < max_duration)   usleep(t*1000000);
+    else            usleep(max_duration*1000000);
+    mot_Run(0,0,0,0);
+    //mot_Run(.01,0,.01,0);
 }
 
 // Small counterclockwise motor pulse
 void smallPulseCCW(float t){
-    printf("Pulse Counterclockwise\n");
-	if(UseOnlySingleMotor){
-        if(cCWSwitcher) mot_Run(straightSpeed,straightSpeed,smallPulseSpeed,straightSpeed);
-		else			mot_Run(smallPulseSpeed,straightSpeed,straightSpeed,straightSpeed);
-		cCWSwitcher = !cCWSwitcher;
-    }
-    else{ 
-		turnCCW(smallPulseSpeed);
-    }
-    usleep(t*1000000);
-    goStraight(straightSpeed);
+	float min_duration = 1;
+    float max_duration = 1.5;
+
+	// Lower bound the pulse time
+	if (t < 0.8)	t = min_duration;
+	
+	//mot_Run(0,.01,0,.01);
+    if(cCWSwitcher) mot_Run(0,0,0,0.01);
+	else mot_Run(0,0.01,0,0);
+	cCWSwitcher = !cCWSwitcher;
+	if( t < max_duration)   usleep(t*1000000);
+
+    else                usleep(max_duration*1000000);
+    mot_Run(0,0,0,0);
+    //mot_Run(0,.01,0,.01);
 }
-void goStraight(float speed){
-	// make it not spin	.1, 1.8 , 1 ,1.8
-	mot_Run(speed,speed,speed,speed);	
-}
 
 
-
-void pid_controller(FILE * data_file){
+void pid_controller(){
     // First thing: check for user input
 
 
     // Control algorithm stuff
     // compute and print the elapsed time in millisec
-
-	PositionTimePair posTimePair = getPositionAndTimestamp();
-	if(prevTimestamp == posTimePair.timestamp) return;
-	
-	gettimeofday(&t2, NULL);
+    gettimeofday(&t2, NULL);
     float dt = (t2.tv_sec - t1.tv_sec) ;      // sec
     dt += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
     t1 = t2;
 
+	PositionTimePair posTimePair = getPositionAndTimestamp();
+	if(prevTimestamp == posTimePair.timestamp) return;
 	printf("\n");
 	prevTimestamp = posTimePair.timestamp;
     int angle = posTimePair.position;
 
-	// Write to file if ignore data not set
-	if (ignore_datawrite == 0) {
-		// Convert timestamp to string
-		char buff[20];
-		time_t now = posTimePair.timestamp;
-		strftime(buff, 20, "%Y-%m-%d_%H:%M:%S", localtime(&now));
-	
-		fprintf(data_file,buff); // Write timestamp to file
-	}
-	
-    printf("Angle: %i      prevAngle: %i    dt: %f \n",angle,prevAngle,dt);
-	
-	// Write to file if ignore data not set
-	if (ignore_datawrite == 0) {
-		fprintf(data_file,"\nAngle: %i      prevAngle: %i    dt: %f \n",angle,prevAngle,dt);
-    }
-	
-	if(angle == 9999){
-        integral = 0;
-        counter = (counter+1);
-        if(counter%5 == 4) smallPulse(1,.5);
+    printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
+
+    if(angle == 9999){
+        counter = (counter+1)%5;
+        if(counter == 4) smallPulse(1,1.5);
         return;
     }
-    else{
-        if(counter){
-	    int x;
-            for(x = 0; x < counter/10; x++){		//half as many pulses in opposite direction
-                smallPulse(-1, .5);
-            }
-            counter = 0;
-        }
-	}
-	
     // Velocity Calculation
     //( (float)(time - prevTime)/CLOCKS_PER_SEC );
     float vel = prevAngle == 9999 ? 0 : (float)(angle - prevAngle)/(dt);
     printf("Vel: %f\n",vel);
-	
-	// Write to file if ignore data not set
-	if (ignore_datawrite == 0) {
-		fprintf(data_file,"Vel: %f\n",vel);
-	}
-	
-	if( abs(angle) < 10 && fabsf(vel) <10 ) 	{
-		usleep(.1*1000000);		//not sure if this line necessary? (to prevent pulses from merging)
-		goStraight(straightSpeed);
-		usleep(.1*1000000);
-	}
+
     // Error Calculation
     float error = vel - ( - 2 * float(angle)/50 );
-    integral = integral*.8 + error*dt;
+    integral = integral*.5 + error*dt;
     float derivative = (error - previous_error)/dt;
-    float output =  -2*error - 3*integral - 1*derivative;
-    printf("Error: %f     integral: %f     derivative: %f  \n", error,integral,derivative);
-	printf("Prev error: %f    Output: %f  \n",previous_error,output);
-	
-	// Write data to file if ignore data not set
-	if (ignore_datawrite == 0) {
-		fprintf(data_file,"Error: %f     integral: %f     derivative: %f  \n", error,integral,derivative);
-		fprintf(data_file,"Prev error: %f    Output: %f  \n",previous_error,output);
-	}
-	
-	// Print what pulse was given as a response
+    float output =  -2*error - 1*integral - 1*derivative/dt;
+    printf("Error: %f       Output: %f\n", error, output);
+
+    // Print what pulse was given as a response
     previous_error = error;
-    float dir = output == 0 ? 0 : output/fabsf(output);
-    float pulseStrength = fabsf(output)/120 * .7 ;		// try to keep the range between .8 and 1.5
+    float dir = output == 0 ? 0 : output/abs(output);
+    float pulseStrength = output > 0? output : -output; // abs() not working?
+    pulseStrength = pulseStrength/70 * .7 +.8;
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
-	
-	// Write to file if ignore data not set
-	if (ignore_datawrite == 0) {
-		fprintf(data_file,"smallPulse(%f,%f)\n",dir,pulseStrength);
-	}
-	
-//    if(output < 150){										// sometimes output is huge randomly? TODO: find out why
-		smallPulse(dir,pulseStrength);
-//	}
+    smallPulse(dir,pulseStrength);
     //usleep(.1 * 1000000);
 
-    prevDuration = fabsf(output)>90 ? .9 : fabsf(output)/90*.9;
+    prevDuration = abs(output)>90 ? .9 : abs(output)/90*.9;
     prevAngle = angle;
 }
 
 // Handle user input
 void checkKeypress(){
     int c=tolower(util_getch());
-	if(c=='n') { // Ignore navdata
-		printf("\nIgnoring Navdata\n");
-		ignore_navdata = 1;
-	}
-	if(c=='w') { // Ignore write data to file
-		printf("\nIgnore writing data to file\n");
-		ignore_datawrite = 1;
-	}
-    if(c=='q') {
+    
+	if(c=='q') {
 		stopLoop = true;
+	}
+	if(c=='n') { // Ignore navdata
+		printf("Ignoring Navdata\n");
+		ignore_navdata = 1;
 	}
     if(c=='1') {
         printf("\rCounterclockwise pulse\n");
-        pulseCCW(2);
+        pulseCCW(pulseDuration);
     }
     if(c=='2') {
         printf("\rClockwise pulse\n");
-        pulseCW(2);
+        pulseCW(pulseDuration);
     }
     if(c=='3') {
         smallPulseCCW(.1);
@@ -367,10 +309,10 @@ void checkKeypress(){
     }
     if(c=='5') {
         printf("\rRun All Motors 50%            ");
-        throttle1 = .3;
-        throttle2 = .3;
-        throttle3 = .3;
-        throttle4 = .3;
+        throttle1 = .01;
+        throttle2 = .01;
+        throttle3 = .01;
+        throttle4 = .01;
         mot_Run(throttle1,throttle2,throttle3,throttle4);
     }
     if(c==',') {
@@ -602,7 +544,6 @@ void * process_images(void * param)
             sum += n;
         }
 
-
         // Convert buffer to integer or NULL
         char none[] = "None";
         int equality = 0;
@@ -642,30 +583,25 @@ void * process_images(void * param)
 }
 
 // Use navigation data to set motors
-void checkNavdata (nav_struct * nav,float * nav_posptr,FILE * data_file)
+void checkNavdata (nav_struct * nav)
 {
-		// Get navdata sample
-		int rc = nav_GetSample(nav);
-		if(rc) {
-			printf("ERROR: nav_GetSample return code=%d\n",rc); 
-		}
-		
-		// Get timestamp and convert to string
-		char buff[20];
-		PositionTimePair cur_timepair = getPositionAndTimestamp();
-		time_t now = cur_timepair.timestamp;
-		strftime(buff, 20, "%Y-%m-%d_%H:%M:%S", localtime(&now));
-		
-		// Print timestamp into file
-		fprintf(data_file,buff);
-		
-		// Print Navdata 
-		nav_Print(nav,data_file);
-		
-		// Calculate position
-		*nav_posptr += (RAD2DEG(nav->gz))*(nav->dt);
-		
-		fprintf (data_file,"new position is %f and gyro is %f\n",*nav_posptr,nav->gy);
+	// Get navdata sample
+	int rc = nav_GetSample(nav);
+	if(rc) {
+		printf("ERROR: nav_GetSample return code=%d\n",rc); 
+	}
+	
+	// Print Navdata 
+	nav_Print(nav);
+	
+	// Shut off motors if z-axis accelerometer is outside thresholds
+	if (nav->az >= 0.3 && ignore_navdata==0) {
+		throttle1 = 0.01;
+        throttle2 = 0.01;
+        throttle3 = 0.01;
+        throttle4 = 0.01;
+        mot_Run(throttle1,throttle2,throttle3,throttle4);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -689,7 +625,7 @@ int main()
 	
 	// Check if navdata initializes
 	int nav_fail = 0;
-	if (rc==1) {
+	if (rc==0) {
 		printf("navdata failed to initialize\n");
 		nav_fail = 1;
 	}
@@ -701,17 +637,7 @@ int main()
 		nav_fail = 1;
 	}
 	
-	// Initialize Nav position
-	float nav_position = 0;
-	
-	// Open file for write to store data
-	char buff[20];
-	time_t now = time(NULL);
-	strftime(buff, 20, "%Y-%m-%d_%H:%M:%S", localtime(&now));
-	FILE * data_fd;
-	data_fd = fopen(buff,"w");
-    
-	// Kick off value getting thing in a separate thread!
+    // Kick off value getting thing in a separate thread!
     pthread_create(&image_processing_thread, NULL, process_images, NULL);
 
 
@@ -736,42 +662,32 @@ int main()
     gettimeofday(&t1, NULL);
 
     // PID Loop
-    float s = .3;
+    float s = .01;
     dir= 1;
-	mot_Run(straightSpeed,straightSpeed,straightSpeed,straightSpeed);
-	bool runningMotors = true;
     while(1) {
         checkKeypress();
-		if(waitToStart){
-			mot_Run(0,0,0,0);
-			runningMotors = false;
-			continue;
-		}
-		if(!runningMotors){
-			mot_Run(straightSpeed,straightSpeed,straightSpeed,straightSpeed);
-			runningMotors = true;
-		}
+		if(waitToStart) continue;
         if(stopLoop) break;
 		
-		// Check navdata if navdata initiates & ignore navdata not set
-		if (nav_fail == 0 && ignore_navdata == 0 && waitToStart == false) {
-			checkNavdata(&nav,&nav_position,data_fd);
+		// Check navdata if navdata initiates
+		if (nav_fail == 0) {
+			checkNavdata(&nav);
 		}
-        
-		pid_controller(data_fd);
+		
+        pid_controller();
 /*      smallPulse(dir,.9);
         usleep(s * 1000000);
         smallPulse(dir,.9);
         usleep(1.5 * 1000000);
         printf("%f\n",s);
         if(dir > 0) dir = -1; else dir = 1;
-        s+=.3;
+        s+=.01;
         smallPulse(dir,.9);
         usleep(s * 1000000);
         smallPulse(dir,.9);
         usleep(1.5 * 1000000);
         printf("%f\n",s);
-        s+=.3;
+        s+=.01;
 */
         //yield to other threads
         pthread_yield();
@@ -783,9 +699,7 @@ int main()
     //close(sockfd);
     //close(newsockfd); // Close TCP socket
     //video_Close(&vid); // Close video thread
-	fclose(data_fd);
     mot_Close(); // Close motor thread
-	nav_Close(); // Close navdata
     printf("\nDone!\n");
 
     return 0;
