@@ -185,16 +185,17 @@ void turnCCW(float speed){
 void turnCW(float speed){
 	mot_Run(straightSpeed,speed,straightSpeed,speed);	
 }
-float maxDuration = 1.5;
+float maxDuration = .5;
 void smallPulse(float dir,float duration){
 	if(duration > maxDuration) duration = maxDuration;
     printf("dir %f,  duration %f\n",dir,duration);
-    if(dir>0)   smallPulseCCW(duration);
-    else        smallPulseCW(duration);
+    if(dir>0)   smallPulseCW(duration);
+    else        smallPulseCCW(duration);
 }
 
 // Small clockwise motor pulse
 void smallPulseCW(float t){  //starts with a pulse, then lowers speed
+	printf("Pulse Clockwise\n");
     if(UseOnlySingleMotor){ //changed
         if(cWSwitcher)  mot_Run(straightSpeed,straightSpeed,straightSpeed,smallPulseSpeed);
 		else			mot_Run(straightSpeed,smallPulseSpeed,straightSpeed,straightSpeed);
@@ -209,7 +210,8 @@ void smallPulseCW(float t){  //starts with a pulse, then lowers speed
 
 // Small counterclockwise motor pulse
 void smallPulseCCW(float t){
-    if(UseOnlySingleMotor){
+    printf("Pulse Counterclockwise\n");
+	if(UseOnlySingleMotor){
         if(cCWSwitcher) mot_Run(straightSpeed,straightSpeed,smallPulseSpeed,straightSpeed);
 		else			mot_Run(smallPulseSpeed,straightSpeed,straightSpeed,straightSpeed);
 		cCWSwitcher = !cCWSwitcher;
@@ -233,18 +235,20 @@ void pid_controller(){
 
     // Control algorithm stuff
     // compute and print the elapsed time in millisec
-    gettimeofday(&t2, NULL);
+
+	PositionTimePair posTimePair = getPositionAndTimestamp();
+	if(prevTimestamp == posTimePair.timestamp) return;
+	
+	gettimeofday(&t2, NULL);
     float dt = (t2.tv_sec - t1.tv_sec) ;      // sec
     dt += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
     t1 = t2;
 
-	PositionTimePair posTimePair = getPositionAndTimestamp();
-	if(prevTimestamp == posTimePair.timestamp) return;
 	printf("\n");
 	prevTimestamp = posTimePair.timestamp;
     int angle = posTimePair.position;
 
-    printf("Angle: %i      prevAngle: %i\n",angle,prevAngle);
+    printf("Angle: %i      prevAngle: %i    dt: %f \n",angle,prevAngle,dt);
 
     if(angle == 9999){
         integral = 0;
@@ -255,7 +259,7 @@ void pid_controller(){
     else{
         if(counter){
 	    int x;
-            for(x = 0; x < counter/10; x++){
+            for(x = 0; x < counter/10; x++){		//half as many pulses in opposite direction
                 smallPulse(-1, .5);
             }
             counter = 0;
@@ -275,19 +279,19 @@ void pid_controller(){
 	}
     // Error Calculation
     float error = vel - ( - 2 * float(angle)/50 );
-    integral = integral*.5 + error*dt;
+    integral = integral*.8 + error*dt;
     float derivative = (error - previous_error)/dt;
-    float output =  -2*error - 1*integral - 1*derivative/dt;
-    printf("Error: %f       Output: %f\n", error, output);
-
+    float output =  -2*error - 3*integral - 1*derivative;
+    printf("Error: %f     integral: %f     derivative: %f  \n", error,integral,derivative);
+	printf("Prev error: %f    Output: %f  \n",previous_error,output);
     // Print what pulse was given as a response
     previous_error = error;
     float dir = output == 0 ? 0 : output/fabsf(output);
-    float pulseStrength = fabsf(output)/70 * .7 ;		// try to keep the range between .8 and 1.5
+    float pulseStrength = fabsf(output)/120 * .7 ;		// try to keep the range between .8 and 1.5
     printf("smallPulse(%f,%f)\n",dir,pulseStrength);
-    if(output < 150){										// sometimes output is huge randomly? TODO: find out why
+//    if(output < 150){										// sometimes output is huge randomly? TODO: find out why
 		smallPulse(dir,pulseStrength);
-	}
+//	}
     //usleep(.1 * 1000000);
 
     prevDuration = fabsf(output)>90 ? .9 : fabsf(output)/90*.9;
@@ -302,11 +306,11 @@ void checkKeypress(){
 
     if(c=='1') {
         printf("\rCounterclockwise pulse\n");
-        pulseCCW(pulseDuration);
+        pulseCCW(2);
     }
     if(c=='2') {
         printf("\rClockwise pulse\n");
-        pulseCW(pulseDuration);
+        pulseCW(2);
     }
     if(c=='3') {
         smallPulseCCW(.1);
