@@ -50,18 +50,39 @@
 #define WAIT_DURATION 1
 #define DEFAULT_POWER 0.01
 
-// NOTE: 0.5-0.9 for ascending in zero g.
-#define FLYUP_POWER 0.6
-#define TURN_DURATION = 2.3;
-#define STOP_DURATION = 1;
-#define DEFAULT_FLYUP_DURATION = 5.0;
-#define ADDITIONAL_POWER = 0.05;
+// NOTE: 0.5-0.9 max total for ascending in zero g.
+// This is ADDITIONAL (to the defaults, default_n below)
+#define FLYUP_POWER 0.8
+
+// Direction dependent durations
+#define LEFT_TURN_DURATION 1.5
+#define LEFT_STOP_DURATION 1
+#define RIGHT_TURN_DURATION .5
+#define RIGHT_STOP_DURATION .5
+
+// Cancellation of acceleration when we turn in search of red
+#define ACCEL_CANCEL 0
+
+#define TURN_DURATION .5
+#define STOP_DURATION .5
+#define SPACER_DURATION 2
+
+#define DEFAULT_FLYUP_DURATION 5.0
+#define ADDITIONAL_POWER 0.05
+
+// Parameters for completely neutral flight of this drone
+// Any drift should tend to go right (clockwise) 
+// (but there should not be drift)
+#define DEFAULT_1 0.1
+#define DEFAULT_2 0.18
+#define DEFAULT_3 0.1
+#define DEFAULT_4 0.18
 
 // Global motor speeds
-float motor1 = DEFAULT_POWER;
-float motor2 = DEFAULT_POWER;
-float motor3 = DEFAULT_POWER;
-float motor4 = DEFAULT_POWER;
+float motor1 = DEFAULT_1;
+float motor2 = DEFAULT_2;
+float motor3 = DEFAULT_3;
+float motor4 = DEFAULT_4;
 
 ///////////////////////////////////////////////////
 // THREADING
@@ -102,7 +123,7 @@ void error(const char *msg)
     exit(0);
 }
 
-void turnLeft(float seconds_to_sleep, float additional_power){
+void turnRight(float seconds_to_sleep, float additional_power){
     // Add power to two motors
     motor2 = motor2 + additional_power;
     motor4 = motor4 + additional_power;
@@ -110,9 +131,12 @@ void turnLeft(float seconds_to_sleep, float additional_power){
 
     // Sleep - usleep uses microseconds
     usleep(seconds_to_sleep * 1000000);
+    motor2 = motor2 - additional_power;
+    motor4 = motor4 - additional_power;
+    mot_Run(motor1, motor2, motor3, motor4);
 }
 
-void turnRight(float seconds_to_sleep, float additional_power){
+void turnLeft(float seconds_to_sleep, float additional_power){
     // Add power to two motors
     motor1 = motor1 + additional_power;
     motor3 = motor3 + additional_power;
@@ -120,19 +144,22 @@ void turnRight(float seconds_to_sleep, float additional_power){
 
     // Sleep - usleep uses microseconds
     usleep(seconds_to_sleep * 1000000);
+    motor1 = motor1 - additional_power;
+    motor3 = motor3 - additional_power;
+    mot_Run(motor1, motor2, motor3, motor4);
 }
 
-void setAllMotors(float seconds_to_sleep, float power){
+void setAllMotors(float seconds_to_sleep, float additional_power){
     // Start the motor
-    motor1 = power;
-    motor2 = power;
-    motor3 = power;
-    motor4 = power;
+    motor1 = DEFAULT_1 + additional_power;
+    motor2 = DEFAULT_2 + additional_power;
+    motor3 = DEFAULT_3 + additional_power;
+    motor4 = DEFAULT_4 + additional_power;
 
     mot_Run(motor1, motor2, motor3, motor4);
 
-    // Sleep - usleep uses microseconds
-    usleep(seconds_to_sleep * 1000000);
+    // Sleep
+    sleep(seconds_to_sleep);
 }
 
 void controller(){
@@ -152,25 +179,40 @@ void controller(){
 
     // If we detect no red, turn a small amount.
     if(curr_pos == 9999){
-        // Turn right for default duration at 0.01 additional power.
-        turnRight(TURN_DURATION, 0.01);
-        turnLeft(STOP_DURATION, 0.01);
+        // Just turn left for now
+        turnLeft(LEFT_TURN_DURATION, ADDITIONAL_POWER);
+
+        // Add a little more time to the stopper than the original turn
+        // command, to eliminate potential snowballing of acceleration
+        // TUNE THIS IN FLIGHT: more velocity cancelation if 
+        // the search turns are too big. Less if the drone isn't getting 
+        // anywhere.
+        turnRight(LEFT_STOP_DURATION + ACCEL_CANCEL, ADDITIONAL_POWER);
+
+        // Return the motors to neutral speed
+        setAllMotors(SPACER_DURATION, DEFAULT_POWER);
         return;
     }
 
     // If we're here, red was detected. Find out if we turn right or left.
     if (curr_pos < -POSITION_MARGIN_OF_ERROR){
         // Turn right for duration w/ additional power.
-        turnRight(TURN_DURATION, ADDITIONAL_POWER);
-        turnLeft(STOP_DURATION, ADDITIONAL_POWER);
+        turnRight(RIGHT_TURN_DURATION, ADDITIONAL_POWER);
 
-        // Equalize and sleep for 2 seconds before proceeding
+        // Stop turning right by canceling out the velocity
+        turnLeft(RIGHT_STOP_DURATION, ADDITIONAL_POWER);
+
+        // Go to neutral
+        setAllMotors(SPACER_DURATION, DEFAULT_POWER);
     } else if (curr_pos > POSITION_MARGIN_OF_ERROR){
         // Turn left for duration w/ additional power.
-        turnLeft(TURN_DURATION, ADDITIONAL_POWER);
-        turnRight(STOP_DURATION, ADDITIONAL_POWER);
+        turnLeft(LEFT_TURN_DURATION, ADDITIONAL_POWER);
 
-        setAllMotors(2, DEFAULT_POWER);
+        // Stop turning left by canceling out the velocity
+        turnRight(LEFT_STOP_DURATION, ADDITIONAL_POWER);
+
+        // Go to neutral
+        setAllMotors(SPACER_DURATION, DEFAULT_POWER);
     } else{
         // Fly up for default duration at 0.1 additional power.
         setAllMotors(DEFAULT_FLYUP_DURATION, FLYUP_POWER);
@@ -186,9 +228,19 @@ void checkKeypress(){
     int c=tolower(util_getch());
 
     if(c=='q') stopLoop = true;
-    if(c=='1') {
-        turnRight(TURN_DURATION, 0.01);
-        turnLeft(STOP_DURATION, 0.01);
+    if(c=='r') {
+        turnRight(TURN_DURATION, 0.2);
+        //turnLeft(STOP_DURATION, 0.1);
+        setAllMotors(1, DEFAULT_POWER);
+    }
+    if(c=='l') {
+        turnLeft(TURN_DURATION, 0.2);
+        //turnRight(STOP_DURATION, 0.1);
+        setAllMotors(1, DEFAULT_POWER);
+    }
+    if(c=='n') {
+        // Neutral
+        setAllMotors(0, 0);
     }
     if(c==' ') {
         printf("\rStop            ");
@@ -443,10 +495,8 @@ int main()
     // Controller Loop
     while(1) {
         checkKeypress();
-        if(waitToStart) continue;
         if(stopLoop) break;
-
-        controller();
+        if(!waitToStart) controller();
 
         //yield to other threads
         pthread_yield();
