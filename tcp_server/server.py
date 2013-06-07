@@ -23,7 +23,7 @@ def make_sure_path_exists(path):
 
 class PositionServer():
 
-    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True, store_images=True):
+    def __init__(self, ip='192.168.1.1', port=7777, buffer_size=9216, yuv_size=92160, display=False, threshold=10000, img_height=96, img_width=640, flip=True, store_images=True, correction_factor=0):
         # Initialize the environment
         self.tcp_ip = ip
         self.tcp_port = port
@@ -48,6 +48,9 @@ class PositionServer():
 
         # Colortracker threshold
         self.threshold = threshold
+
+        # Alignment correction factor
+        self.correction_factor = correction_factor
 
         # For this specific run, the path to store images in
         self.run_img_path = 'images/' + str(datetime.now()) + '/'
@@ -134,6 +137,8 @@ class PositionServer():
                 if self.flip:
                     position *= -1
 
+                position = position + self.correction_factor
+
                 # Position found
                 print "Red found, position is " + str(position) + "!"
                 print "image %d received" % (image_number)
@@ -167,12 +172,18 @@ def cli():
         threshold = int(sys.argv[1])
         position_server = PositionServer(threshold=threshold)
 
-    elif len(sys.argv) == 3:
+    elif len(sys.argv) >= 3:
         # Threshold, show image stream
         threshold = sys.argv[1]
         display = sys.argv[2] == "--showdisplay"
 
-        position_server = PositionServer(threshold=threshold, display=display)
+        # For y displacement correction
+        correction_factor = 0
+        if len(sys.argv) == 4:
+            correction_factor = sys.argv[3]
+
+        position_server = PositionServer(threshold=threshold, display=display, correction_factor=correction_factor)
+
 
 
     position_server.connect()
